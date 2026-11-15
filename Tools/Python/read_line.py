@@ -24,17 +24,17 @@ try:
     time.sleep(2)
 
     print("===== AGV SENSOR MONITOR =====")
-    print(f"COM: {PORT}")
-    print(f"Baudrate: {BAUDRATE}")
+    print(f"COM      : {PORT}")
+    print(f"Baudrate : {BAUDRATE}")
     print("-----------------------------------")
-    print("LINE SENSOR")
-    print("AIN1   AIN2   AIN3   AIN4   AIN5")
+    print("TCS34725 COLOR SENSOR")
     print("-----------------------------------")
 
     while True:
 
         data = ser.readline().decode(
-            "utf-8", errors="ignore"
+            "utf-8",
+            errors="ignore"
         ).strip()
 
         if not data:
@@ -71,10 +71,12 @@ try:
         # DOC 5 CAM BIEN LINE
         # ==============================
 
+        # Sau nay co the bo sung:
+        #
         # else:
         #     try:
         #         values = [int(x) for x in data.split(",")]
-
+        #
         #         if len(values) == 5:
         #             print(
         #                 f"{values[4]:5d}  "
@@ -83,7 +85,7 @@ try:
         #                 f"{values[1]:5d}  "
         #                 f"{values[0]:5d}"
         #             )
-
+        #
         #     except ValueError:
         #         continue
 
@@ -96,3 +98,4 @@ except KeyboardInterrupt:
 finally:
     if "ser" in locals() and ser.is_open:
         ser.close()
+        print("Da dong cong UART.")

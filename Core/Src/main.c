@@ -22,10 +22,17 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "motor.h"
+#include "motor_test.h"
+
+#include "bsp_uart.h"
+// #include "color_sensor_test.h"
+
 #include "line_sensor.h"
-#include "telemetry.h"
-#include "color_sensor.h"
-#include "color_classifier.h"
+#include "line_sensor_test.h"
+
+#include "line_tracking.h"
+
 
 /* USER CODE END Includes */
 
@@ -116,70 +123,66 @@ int main(void)
   MX_ADC1_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+  /*khoi tao test motor*/
+  // if (Motor_Init() != MOTOR_OK)
+  // {
+  //     Error_Handler();
+  // }
 
-  HAL_StatusTypeDef color_status;
-  color_status = ColorSensor_Init();
+  // MotorTest_Run();
 
-  if (color_status != HAL_OK)
+  /*TEST COLOR SENSOR*/
+  // BSP_UART_Init(&huart3);
+
+  // if (ColorSensorTest_Init(&hi2c1) != HAL_OK)
+  // {
+  //     BSP_UART_Printf("COLOR SENSOR INIT FAILED\r\n");
+  // }
+  // else
+  // {
+  //     BSP_UART_Printf("COLOR SENSOR INIT SUCCESS\r\n");
+  // }
+
+/* ================= KHOI TAO LINE FOLLOWER ================= */
+
+  /* 1. Khoi tao UART */
+  BSP_UART_Init(&huart3);
+
+  /* 2. Khoi tao 5 cam bien line */
+  if (LineSensor_Init(&hadc1) != HAL_OK)
   {
+      BSP_UART_Printf("LINE SENSOR INIT FAILED\r\n");
       Error_Handler();
   }
 
-  // Khoi dong ADC DMA
-  if (LineSensor_Init() != HAL_OK)
+  BSP_UART_Printf("LINE SENSOR INIT SUCCESS\r\n");
+
+  /* 3. Khoi tao dong co va bo dieu khien PID */
+  if (LineTracking_Init() != MOTOR_OK)
   {
+      BSP_UART_Printf("MOTOR INIT FAILED\r\n");
       Error_Handler();
   }
 
-  HAL_Delay(160);
+  BSP_UART_Printf("LINE TRACKING READY\r\n");
+
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  ColorData color_data = {0};
-  ColorType detected_color = COLOR_UNKNOWN;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-      uint16_t line_values[5];
+ 
 
-    // Doc 5 mat do line
-    LineSensor_Read(line_values);
+    LineTracking_Run();
+    
 
-    // Gui du lieu line
-    Telemetry_SendLine(line_values);
-
-    // Doc du lieu mau
-    if (color_status == HAL_OK)
-    {
-        if (ColorSensor_Read(&color_data) == HAL_OK)
-        {
-            detected_color = ColorClassifier_Classify(&color_data);
-
-            // Gui du lieu mau sang Python
-            const char *color_name = "UNKNOWN";
-
-            if (detected_color == COLOR_RED)
-                color_name = "RED";
-            else if (detected_color == COLOR_BLUE)
-                color_name = "BLUE";
-
-            Telemetry_SendColor(
-                color_data.red,
-                color_data.green,
-                color_data.blue,
-                color_data.clear,
-                color_name
-            );
-        }
-    }
-
-    HAL_Delay(200);
   }
   /* USER CODE END 3 */
 }
@@ -266,7 +269,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_239CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();

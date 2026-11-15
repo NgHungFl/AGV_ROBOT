@@ -44,16 +44,42 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    Core/Src/line_sensor.c
-    Core/Src/telemetry.c
-    Core/Src/color_sensor.c
-    Core/Src/color_classifier.c
+   
+   
+
+    BSP/Motor/motor.c
+    Test/Motor_Test/motor_test.c
+
+    BSP/UART/bsp_uart.c
+
+    BSP/Color_Sensor/tcs34725.c
+    Test/Color_Sensor_Test/color_sensor_test.c
+
+    BSP/Line_Sensor/line_sensor.c
+    Test/Line_Sensor_Test/line_sensor_test.c
+
+    App/Line_Tracking/line_tracking.c
+
     # Add user sources here
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    BSP/Motor
+    Test/Motor_Test
+    
+    BSP/UART
+
+    BSP/Color_Sensor
+    Test/Color_Sensor_Test
+
+    BSP/Line_Sensor
+    Test/Line_Sensor_Test
+
+    App/Line_Tracking
+
+
 )
 
 # Add project symbols (macros)
