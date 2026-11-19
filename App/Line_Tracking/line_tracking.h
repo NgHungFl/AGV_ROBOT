@@ -3,45 +3,27 @@
 #define LINE_TRACKING_H
 
 #include "main.h"
-#include "motor.h"
+#include "line_sensor.h"
+#include "robot_config.h"
 
-/* ================= CAU HINH BAM LINE ================= */
+/* Dat lai bo quan sat / tich phan (goi khi bat dau 1 segment) */
+void LineTracking_Reset(void);
 
-/* Toc do co ban cua xe: 0 - 100 */
-#define LINE_BASE_SPEED              25
+/* Tinh toc do quay mong muon (rad/s), DUONG = re PHAI.
+ * Phai goi LineSensor_Update() truoc.
+ *   v_mm_s     : van toc tien do duoc (mm/s)
+ *   omega_meas : toc do quay do duoc tu encoder (rad/s, duong = phai) */
+float LineTracking_Compute(float dt, float v_mm_s, float omega_meas);
 
-/* Thong so PID - gia tri khoi dau de thu nghiem */
-#define LINE_KP                      0.010f
-#define LINE_KI                      0.0001f
-#define LINE_KD                      0.00005f
+uint8_t LineTracking_IsLost(void);
 
-/* Gioi han muc dieu chinh toc do */
-#define LINE_MAX_CORRECTION          20
+/* Thoi gian mat line lien tuc (s) */
+float LineTracking_GetLostTime(void);
 
-/* Gioi han tich phan */
-#define LINE_INTEGRAL_LIMIT          5000.0f
+/* Vi tri line so voi tam hang mat (mm), DUONG = line ben PHAI */
+float LineTracking_GetError(void);
 
-/* Chu ky dieu khien: 10 ms */
-#define LINE_CONTROL_PERIOD          10U
+/* Uoc luong goc lech (rad) cua bo quan sat */
+float LineTracking_GetHeadingEst(void);
 
-/* ================= NHAN DIEN VACH NGANG ================= */
-
-/* 1: Bat tinh nang dung khi ca 5 mat deu thay den
-   0: Tat tinh nang nay */
-#define LINE_ALL_BLACK_STOP_ENABLE   1
-
-/* Nguong nhan dien mau den: gia tri 0 - 1000 */
-#define LINE_ALL_BLACK_THRESHOLD     700
-
-/* Ca 5 mat deu den lien tuc trong 50 ms thi dung */
-#define LINE_ALL_BLACK_TIME          50U
-
-/* ================= CAC HAM ================= */
-
-Motor_Status_t LineTracking_Init(void);
-
-void LineTracking_Run(void);
-
-void LineTracking_Stop(void);
-
-#endif
+#endif /* LINE_TRACKING_H */

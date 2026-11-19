@@ -26,12 +26,21 @@
 #include "motor_test.h"
 
 #include "bsp_uart.h"
-// #include "color_sensor_test.h"
+#include "color_sensor_test.h"
 
 #include "line_sensor.h"
 #include "line_sensor_test.h"
 
 #include "line_tracking.h"
+
+#include "robot_config.h"
+#include "encoder.h"
+#include "encoder_test.h"
+#include "wheel_control.h"
+#include "agv_motion.h"
+#include "agv_mission.h"
+#include "control_timer.h"
+#include "motion_test.h"
 
 
 /* USER CODE END Includes */
@@ -43,6 +52,18 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+/* ================= CHON CHE DO CHAY ================= */
+#define APP_MODE_MISSION          0   /* chay nhiem vu day du (de 2) */
+#define APP_MODE_ENCODER_TEST     1   /* B1: kiem tra encoder, xoay tay banh */
+#define APP_MODE_SPEED_TEST       2   /* B2: nac vong toc do banh */
+#define APP_MODE_STRAIGHT_TEST    3   /* B3: chay thang 1000 mm, hieu chuan mm/xung */
+#define APP_MODE_FOLLOW_TEST      4   /* B4: bam line 3000 mm */
+#define APP_MODE_LINE_SENSOR_TEST 5   /* in gia tri 5 mat do line */
+#define APP_MODE_COLOR_TEST       6   /* in R,G,B,C cam bien mau */
+#define APP_MODE_DUTY_TEST        7   /* B0: do mo hinh duty-toc do tung dong co */
+
+#define APP_MODE                  APP_MODE_MISSION
 
 /* USER CODE END PD */
 
@@ -123,49 +144,78 @@ int main(void)
   MX_ADC1_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  /*khoi tao test motor*/
-  // if (Motor_Init() != MOTOR_OK)
-  // {
-  //     Error_Handler();
-  // }
+  /* ================= KHOI TAO ROBOT ================= */
 
-  // MotorTest_Run();
-
-  /*TEST COLOR SENSOR*/
-  // BSP_UART_Init(&huart3);
-
-  // if (ColorSensorTest_Init(&hi2c1) != HAL_OK)
-  // {
-  //     BSP_UART_Printf("COLOR SENSOR INIT FAILED\r\n");
-  // }
-  // else
-  // {
-  //     BSP_UART_Printf("COLOR SENSOR INIT SUCCESS\r\n");
-  // }
-
-/* ================= KHOI TAO LINE FOLLOWER ================= */
-
-  /* 1. Khoi tao UART */
+  /* 1. UART */
   BSP_UART_Init(&huart3);
 
-  /* 2. Khoi tao 5 cam bien line */
+  /* 2. 5 cam bien line (ADC + DMA) */
   if (LineSensor_Init(&hadc1) != HAL_OK)
   {
       BSP_UART_Printf("LINE SENSOR INIT FAILED\r\n");
       Error_Handler();
   }
 
-  BSP_UART_Printf("LINE SENSOR INIT SUCCESS\r\n");
+#if (APP_MODE == APP_MODE_MISSION)
 
-  /* 3. Khoi tao dong co va bo dieu khien PID */
-  if (LineTracking_Init() != MOTOR_OK)
+  /* 3. Dong co, encoder */
+  if (Motor_Init() != MOTOR_OK)
   {
       BSP_UART_Printf("MOTOR INIT FAILED\r\n");
       Error_Handler();
   }
 
-  BSP_UART_Printf("LINE TRACKING READY\r\n");
+  if (Encoder_Init() != HAL_OK)
+  {
+      BSP_UART_Printf("ENCODER INIT FAILED\r\n");
+      Error_Handler();
+  }
 
+  /* 4. Cam bien mau + may trang thai nhiem vu */
+  if (AGV_Mission_Init(&hi2c1) != HAL_OK)
+  {
+      BSP_UART_Printf("COLOR SENSOR INIT FAILED\r\n");
+  }
+
+  AGV_Motion_Init();
+
+  /* 5. Bat vong dieu khien 10 ms (TIM2) */
+  if (ControlTimer_Init(AGV_Motion_Tick, ROBOT_CONTROL_PERIOD_MS) != HAL_OK)
+  {
+      Error_Handler();
+  }
+
+  BSP_UART_Printf("AGV READY\r\n");
+
+#elif (APP_MODE == APP_MODE_ENCODER_TEST)
+
+  EncoderTest_Init();
+
+#elif (APP_MODE == APP_MODE_SPEED_TEST)
+
+  MotionTest_Init(MOTION_TEST_SPEED);
+
+#elif (APP_MODE == APP_MODE_STRAIGHT_TEST)
+
+  MotionTest_Init(MOTION_TEST_STRAIGHT);
+
+#elif (APP_MODE == APP_MODE_FOLLOW_TEST)
+
+  MotionTest_Init(MOTION_TEST_FOLLOW);
+
+#elif (APP_MODE == APP_MODE_LINE_SENSOR_TEST)
+
+  LineSensorTest_Init();
+
+#elif (APP_MODE == APP_MODE_COLOR_TEST)
+
+  ColorSensorTest_Init(&hi2c1);
+
+#elif (APP_MODE == APP_MODE_DUTY_TEST)
+
+  MotionTest_Init(MOTION_TEST_DUTY);
+
+#endif
 
   /* USER CODE END 2 */
 
@@ -178,10 +228,30 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
- 
+#if (APP_MODE == APP_MODE_MISSION)
 
-    LineTracking_Run();
-    
+    AGV_Mission_Run();
+
+#elif (APP_MODE == APP_MODE_ENCODER_TEST)
+
+    EncoderTest_Run();
+
+#elif ((APP_MODE == APP_MODE_SPEED_TEST) || \
+       (APP_MODE == APP_MODE_STRAIGHT_TEST) || \
+       (APP_MODE == APP_MODE_FOLLOW_TEST) || \
+       (APP_MODE == APP_MODE_DUTY_TEST))
+
+    MotionTest_Run();
+
+#elif (APP_MODE == APP_MODE_LINE_SENSOR_TEST)
+
+    LineSensorTest_Run();
+
+#elif (APP_MODE == APP_MODE_COLOR_TEST)
+
+    ColorSensorTest_Run();
+
+#endif
 
   }
   /* USER CODE END 3 */

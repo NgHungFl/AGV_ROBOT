@@ -60,6 +60,19 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
     App/Line_Tracking/line_tracking.c
 
+    BSP/Encoder/encoder.c
+    BSP/Control_Timer/control_timer.c
+    Test/Encoder_Test/encoder_test.c
+
+    App/PID/pid.c
+    App/Motor_Model/motor_model.c
+    App/Wheel_Control/wheel_control.c
+    App/Motion_Profile/motion_profile.c
+    App/AGV_Motion/agv_motion.c
+    App/Load_Detect/load_detect.c
+    App/AGV_Mission/agv_mission.c
+    Test/Motion_Test/motion_test.c
+
     # Add user sources here
 )
 
@@ -78,6 +91,23 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Test/Line_Sensor_Test
 
     App/Line_Tracking
+
+    BSP/Encoder
+    BSP/Control_Timer
+    Test/Encoder_Test
+
+    App/Robot_Config
+    App/PID
+    App/Motor_Model
+    App/Wheel_Control
+    App/Motion_Profile
+    App/AGV_Motion
+    App/Load_Detect
+    App/AGV_Mission
+    Test/Motion_Test
+
+
+
 
 
 )

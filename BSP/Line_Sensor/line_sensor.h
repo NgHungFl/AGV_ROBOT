@@ -4,6 +4,7 @@
 
 #include "main.h"
 #include <stdint.h>
+#include "robot_config.h"
 
 /* So luong mat do line */
 #define LINE_SENSOR_COUNT 5U
@@ -21,16 +22,16 @@
  * ================================================= */
 
 #define LINE_S1_BLACK 145U
-#define LINE_S1_WHITE  100U
+#define LINE_S1_WHITE  85U
 
 #define LINE_S2_BLACK 145U
-#define LINE_S2_WHITE  100U
+#define LINE_S2_WHITE  85U
 
 #define LINE_S3_BLACK 150U
-#define LINE_S3_WHITE  105U
+#define LINE_S3_WHITE  85U
 
 #define LINE_S4_BLACK 170U
-#define LINE_S4_WHITE  105U
+#define LINE_S4_WHITE  85U
 
 #define LINE_S5_BLACK 190U
 #define LINE_S5_WHITE  103U
@@ -41,6 +42,21 @@
 #define LINE_WEIGHT_S3 (0)
 #define LINE_WEIGHT_S4 (1000)
 #define LINE_WEIGHT_S5 (2000)
+
+/* Doi vi tri: 1000 don vi = 1 khoang cach giua 2 mat */
+#define LINE_POSITION_TO_MM(pos) \
+    ((float)(pos) * (ROBOT_SENSOR_PITCH_MM / 1000.0f))
+
+/* Chon nhanh khi gap nga re:
+   NONE  : lay trung binh tat ca mat thay line (nhu cu)
+   LEFT  : chi bam nhom mat thay line o ben TRAI nhat
+   RIGHT : chi bam nhom mat thay line o ben PHAI nhat */
+typedef enum
+{
+    LINE_PREF_NONE = 0,
+    LINE_PREF_LEFT,
+    LINE_PREF_RIGHT
+} LinePreference_t;
 
 /* Trang thai line */
 typedef enum
@@ -66,6 +82,8 @@ typedef struct
 HAL_StatusTypeDef LineSensor_Init(ADC_HandleTypeDef *hadc);
 
 void LineSensor_Update(void);
+
+void LineSensor_SetPreference(LinePreference_t pref);
 
 const LineSensor_Data_t *LineSensor_GetData(void);
 

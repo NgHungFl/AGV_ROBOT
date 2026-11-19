@@ -20,6 +20,8 @@ static uint16_t adc_buffer[LINE_SENSOR_COUNT];
 /* Du lieu cam bien */
 static LineSensor_Data_t sensor_data;
 
+static volatile LinePreference_t line_pref = LINE_PREF_NONE;
+
 /* ADC handle */
 static ADC_HandleTypeDef *adc_handle = NULL;
 
@@ -178,14 +180,81 @@ void LineSensor_Update(void)
      * 3. TINH TRUNG BINH CO TRONG SO
      * ------------------------------------------------- */
 
-    for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
     {
-        if (sensor_data.value[i] >= LINE_DETECT_THRESHOLD)
-        {
-            weighted_sum +=
-                (int32_t)weights[i] * sensor_data.value[i];
+        LinePreference_t pref = line_pref;
 
-            total_value += sensor_data.value[i];
+        if (pref == LINE_PREF_NONE)
+        {
+            /* Binh thuong: trung binh tat ca mat thay line */
+            for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
+            {
+                if (sensor_data.value[i] >= LINE_DETECT_THRESHOLD)
+                {
+                    weighted_sum +=
+                        (int32_t)weights[i] * sensor_data.value[i];
+
+                    total_value += sensor_data.value[i];
+                }
+            }
+        }
+        else
+        {
+            /* Chon nhom mat lien tiep (blob) o phia nhanh da chon */
+            int8_t first = -1;
+            int8_t last  = -1;
+            int8_t start = -1;
+
+            for (int8_t i = 0; i <= (int8_t)LINE_SENSOR_COUNT; i++)
+            {
+                uint8_t active =
+                    (i < (int8_t)LINE_SENSOR_COUNT) &&
+                    (sensor_data.value[i] >= LINE_DETECT_THRESHOLD);
+
+                if (active && (start < 0))
+                {
+                    start = i;
+                }
+                else if ((!active) && (start >= 0))
+                {
+                    if (pref == LINE_PREF_LEFT)
+                    {
+                        if (first < 0)
+                        {
+                            first = start;
+                            last  = i - 1;
+                        }
+                    }
+                    else
+                    {
+                        first = start;      /* RIGHT: ghi de, giu nhom cuoi */
+                        last  = i - 1;
+                    }
+
+                    start = -1;
+                }
+            }
+
+            /* Hai line chua tach: vet den rong hon 3 mat.
+               Chi lay 3 mat phia nhanh da chon. */
+            if ((first >= 0) && ((last - first) > 2))
+            {
+                if (pref == LINE_PREF_LEFT)
+                {
+                    last = first + 2;
+                }
+                else
+                {
+                    first = last - 2;
+                }
+            }
+
+            for (int8_t i = first; (first >= 0) && (i <= last); i++)
+            {
+                weighted_sum +=
+                    (int32_t)weights[i] * sensor_data.value[i];
+
+                total_value += sensor_data.value[i];
+            }
         }
     }
 
@@ -205,6 +274,15 @@ void LineSensor_Update(void)
 
         sensor_data.status = LINE_DETECTED;
     }
+}
+
+/* =================================================
+ * CHON NHANH BAM (NGA RE)
+ * ================================================= */
+
+void LineSensor_SetPreference(LinePreference_t pref)
+{
+    line_pref = pref;
 }
 
 /* =================================================

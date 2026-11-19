@@ -184,7 +184,7 @@ const char* TCS34725_ClassifyColor(TCS34725_ColorData_t color)
 {
     uint32_t sum = color.red + color.green + color.blue;
 
-    if (sum < 30)
+    if (sum < 140)
     {
         return "UNKNOWN";
     }

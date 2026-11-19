@@ -1,235 +1,174 @@
 
 #include "line_tracking.h"
-#include "line_sensor.h"
+#include "pid.h"
+#include <math.h>
 
-/* ================= BIEN PID ================= */
+/* =================================================
+ * BAM LINE = MOT BO PID, CAU TRUC DO LYAPUNOV QUYET DINH
+ *
+ * Quy uoc: duong = ben PHAI.
+ *   d     : vi tri line do duoc so voi tam hang mat (mm), d > 0 khi line ben phai
+ *   y     : do lech cua hang mat so voi line = -d
+ *   theta : goc lech giua huong xe va tiep tuyen line (rad), duong = lech phai
+ *   v     : van toc tien (mm/s)
+ *   w     : toc do quay phai (rad/s)  <- dau ra cua bo dieu khien
+ *   L     : khoang cach tu truc banh den hang mat (mm)
+ *   b     : nhieu hang so chua biet cong vao w (do cong line, 2 banh lech nhau)
+ *
+ *   y_dot     = v*theta + L*(w + b)
+ *   theta_dot = w + b - v*kappa
+ *
+ * LUAT DIEU KHIEN (PID + Lyapunov)
+ *   w = -(K*y + v*theta_hat)/L - b_hat ,   b_hat_dot = GAMMA * y
+ *
+ *   Viet theo d = -y:
+ *   w = (K/L) * d              <- P  (Kp = K/L)
+ *     + (C/L) * (-v*theta_hat) <- D  (Kd = C/L, -v*theta = toc do d_dot do goc lech)
+ *     + GAMMA * Integral(d)    <- I  (Ki = GAMMA)
+ *
+ * CHUNG MINH (C = 1, theta do chinh xac):
+ *   Thay vao: y_dot = -K*y + L*b~ ,  b~ = b - b_hat
+ *   V = y^2/2 + (L / (2*GAMMA)) * b~^2
+ *   V_dot = -K*y^2 + L*y*b~ - L*b~*y = -K*y^2 <= 0
+ *   => y bi chan va y -> 0 (bo de Barbalat). Thanh phan I chinh la
+ *   luat thich nghi, nen Ki = GAMMA khong chon tuy tien.
+ *   Voi C < 1: sai so bi chan UUB, C cang gan 1 cang nho
+ *   (chap nhan C < 1 de giam nhay nhieu cua uoc luong theta).
+ *
+ * Goc theta khong do truc tiep duoc -> bo quan sat Luenberger
+ * dung omega do tu encoder:
+ *   y_hat_dot     = v*theta_hat + L*w + l1*(y - y_hat)
+ *   theta_hat_dot = w + l2*(y - y_hat)
+ *   l1 = 2*zeta*wn ,  l2 = wn^2 / v
+ * ================================================= */
 
-static float integral = 0.0f;
-static int32_t previous_error = 0;
-static uint32_t previous_time = 0;
+#define LINE_L_MM        ROBOT_SENSOR_DIST_MM
 
-/* ================= BIEN NHAN DIEN VACH NGANG ================= */
+static PID_t line_pid;
 
-static uint32_t all_black_start = 0;
-static uint8_t all_black_timer_active = 0;
-static uint8_t finish_detected = 0;
+static float y_hat;
+static float theta_hat;
+static uint8_t obs_ready;
 
-/* ================= CAC HAM NOI BO ================= */
+static float error_mm;
+static float omega_cmd;
+static float lost_time;
 
-static int16_t LimitSpeed(int16_t speed)
+static float Limit(float x, float lim)
 {
-    if (speed > 100)
-        speed = 100;
+    if (x > lim)
+    {
+        return lim;
+    }
 
-    if (speed < -100)
-        speed = -100;
+    if (x < -lim)
+    {
+        return -lim;
+    }
 
-    return speed;
+    return x;
 }
 
-
-static float LimitIntegral(float value)
+void LineTracking_Reset(void)
 {
-    if (value > LINE_INTEGRAL_LIMIT)
-        value = LINE_INTEGRAL_LIMIT;
+    PID_Init(
+        &line_pid,
+        LYAP_K / LINE_L_MM,         /* Kp */
+        LYAP_GAMMA,                 /* Ki */
+        LYAP_C / LINE_L_MM,         /* Kd */
+        -LINE_OMEGA_MAX,
+        LINE_OMEGA_MAX,
+        LYAP_I_LIMIT);
 
-    if (value < -LINE_INTEGRAL_LIMIT)
-        value = -LINE_INTEGRAL_LIMIT;
+    y_hat     = 0.0f;
+    theta_hat = 0.0f;
+    obs_ready = 0;
 
-    return value;
+    error_mm  = 0.0f;
+    omega_cmd = 0.0f;
+    lost_time = 0.0f;
 }
 
-
-static float LimitCorrection(float value)
+uint8_t LineTracking_IsLost(void)
 {
-    if (value > LINE_MAX_CORRECTION)
-        value = LINE_MAX_CORRECTION;
-
-    if (value < -LINE_MAX_CORRECTION)
-        value = -LINE_MAX_CORRECTION;
-
-    return value;
+    return (lost_time > 0.0f) ? 1U : 0U;
 }
 
-
-/* ================= KHOI TAO ================= */
-
-Motor_Status_t LineTracking_Init(void)
+float LineTracking_GetLostTime(void)
 {
-    /* Reset PID */
-    integral = 0.0f;
-    previous_error = 0;
-    previous_time = HAL_GetTick();
-
-    /* Reset nhan dien vach ket thuc */
-    all_black_start = 0;
-    all_black_timer_active = 0;
-    finish_detected = 0;
-
-    /* Khoi tao dong co */
-    Motor_StopAll();
-
-    if (Motor_Init() != MOTOR_OK)
-    {
-        return MOTOR_ERROR;
-    }
-
-    return MOTOR_OK;
+    return lost_time;
 }
 
-
-/* ================= DUNG XE ================= */
-
-void LineTracking_Stop(void)
+float LineTracking_GetError(void)
 {
-    Motor_StopAll();
-
-    integral = 0.0f;
-    previous_error = 0;
+    return error_mm;
 }
 
-
-/* ================= CHUONG TRINH PID BAM LINE ================= */
-
-void LineTracking_Run(void)
+float LineTracking_GetHeadingEst(void)
 {
-    uint32_t current_time;
-    uint32_t elapsed_time;
+    return theta_hat;
+}
 
-    float dt;
-    float p_term;
-    float i_term;
-    float d_term;
-    float output;
+float LineTracking_Compute(float dt, float v_mm_s, float omega_meas)
+{
+    const LineSensor_Data_t *data = LineSensor_GetData();
 
-    int32_t error;
+    float v_eff = (v_mm_s > OBS_V_MIN_MM_S) ? v_mm_s : OBS_V_MIN_MM_S;
 
-    int16_t correction;
-    int16_t left_speed;
-    int16_t right_speed;
+    float y_meas;
+    float innov;
+    float l1 = 2.0f * OBS_ZETA * OBS_WN;
+    float l2 = (OBS_WN * OBS_WN) / v_eff;
 
-    const LineSensor_Data_t *data;
-
-    uint8_t all_black = 1;
-
-    /* Xe da nhan dien vach ket thuc thi giu dung */
-    if (finish_detected)
-    {
-        Motor_StopAll();
-        return;
-    }
-
-    /* Chi dieu khien moi 10 ms */
-    current_time = HAL_GetTick();
-    elapsed_time = current_time - previous_time;
-
-    if (elapsed_time < LINE_CONTROL_PERIOD)
-    {
-        return;
-    }
-
-    previous_time = current_time;
-
-    dt = (float)elapsed_time / 1000.0f;
-
-    if (dt <= 0.0f)
-    {
-        return;
-    }
-
-    /* Cap nhat du lieu 5 cam bien */
-    LineSensor_Update();
-
-    data = LineSensor_GetData();
-
-    /* ================= KIEM TRA CA 5 MAT DEU DEN ================= */
-
-#if LINE_ALL_BLACK_STOP_ENABLE
-
-    for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
-    {
-        if (data->value[i] < LINE_ALL_BLACK_THRESHOLD)
-        {
-            all_black = 0;
-            break;
-        }
-    }
-
-    if (all_black)
-    {
-        if (all_black_timer_active == 0)
-        {
-            all_black_start = current_time;
-            all_black_timer_active = 1;
-        }
-
-        if ((current_time - all_black_start) >= LINE_ALL_BLACK_TIME)
-        {
-            finish_detected = 1;
-
-            Motor_StopAll();
-
-            integral = 0.0f;
-            previous_error = 0;
-
-            return;
-        }
-    }
-    else
-    {
-        all_black_timer_active = 0;
-        all_black_start = 0;
-    }
-
-#endif
-
-    /* ================= KIEM TRA MAT LINE ================= */
+    /* ================= MAT LINE ================= */
 
     if (data->status == LINE_LOST)
     {
-        Motor_StopAll();
+        lost_time += dt;
 
-        integral = 0.0f;
-        previous_error = 0;
+        /* Quan sat chi du doan, khong co do luong */
+        y_hat     += dt * ((v_eff * theta_hat) + (LINE_L_MM * omega_meas));
+        theta_hat += dt * omega_meas;
 
-        return;
+        if (lost_time > LINE_LOST_HOLD_S)
+        {
+            omega_cmd = 0.0f;
+        }
+
+        return omega_cmd;
     }
 
-    /* ================= TINH PID ================= */
+    lost_time = 0.0f;
 
-    error = data->position;
+    /* d: vi tri line (mm), duong = ben phai */
+    error_mm = LINE_POSITION_TO_MM(data->position);
+    y_meas   = -error_mm;
 
-    /* P */
-    p_term = LINE_KP * (float)error;
+    /* ================= BO QUAN SAT ================= */
 
-    /* I */
-    integral += (float)error * dt;
-    integral = LimitIntegral(integral);
+    if (obs_ready == 0)
+    {
+        y_hat     = y_meas;
+        theta_hat = 0.0f;
+        obs_ready = 1;
+    }
 
-    i_term = LINE_KI * integral;
+    innov = y_meas - y_hat;
 
-    /* D */
-    d_term = LINE_KD *
-             ((float)(error - previous_error) / dt);
+    y_hat     += dt * ((v_eff * theta_hat) + (LINE_L_MM * omega_meas) + (l1 * innov));
+    theta_hat += dt * (omega_meas + (l2 * innov));
 
-    previous_error = error;
+    theta_hat = Limit(theta_hat, 0.8f);
 
-    /* Tong PID */
-    output = p_term + i_term + d_term;
+    /* ================= PID (cau truc Lyapunov) =================
+       error = d_hat = -y_hat
+       deriv = -v*theta_hat : toc do thay doi cua d do goc lech xe */
 
-    /* Gioi han muc dieu chinh */
-    output = LimitCorrection(output);
+    omega_cmd = PID_Update(
+        &line_pid,
+        -y_hat,
+        -v_eff * theta_hat,
+        dt);
 
-    correction = (int16_t)output;
-
-    /* ================= DIEU KHIEN 2 DONG CO ================= */
-
-    left_speed  = LINE_BASE_SPEED + correction;
-    right_speed = LINE_BASE_SPEED - correction;
-
-    left_speed  = LimitSpeed(left_speed);
-    right_speed = LimitSpeed(right_speed);
-
-    Motor_SetSpeed(MOTOR_LEFT, left_speed);
-    Motor_SetSpeed(MOTOR_RIGHT, right_speed);
+    return omega_cmd;
 }
