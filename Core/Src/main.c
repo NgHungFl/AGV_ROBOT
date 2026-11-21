@@ -63,7 +63,7 @@
 #define APP_MODE_COLOR_TEST       6   /* in R,G,B,C cam bien mau */
 #define APP_MODE_DUTY_TEST        7   /* B0: do mo hinh duty-toc do tung dong co */
 
-#define APP_MODE                  APP_MODE_MISSION
+#define APP_MODE                  APP_MODE_MISSION 
 
 /* USER CODE END PD */
 
@@ -121,7 +121,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+    HAL_Init();
 
   /* USER CODE BEGIN Init */
 

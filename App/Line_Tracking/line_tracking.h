@@ -23,6 +23,9 @@ float LineTracking_GetLostTime(void);
 /* Vi tri line so voi tam hang mat (mm), DUONG = line ben PHAI */
 float LineTracking_GetError(void);
 
+/* He so nhan van toc tien theo luat (5.13): v = v_R * cos(e3) */
+float LineTracking_GetSpeedFactor(void);
+
 /* Uoc luong goc lech (rad) cua bo quan sat */
 float LineTracking_GetHeadingEst(void);
 

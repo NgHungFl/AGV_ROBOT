@@ -12,12 +12,25 @@ static uint8_t hold_mode = 1;
 
 void WheelControl_Init(void)
 {
+    /* Gain PI rieng tung dong co, doi tu [% tren rpm] sang [% tren mm/s] */
+    const float kp[2] =
+    {
+        WHEEL_L_KP_RPM / ROBOT_MM_S_PER_RPM,
+        WHEEL_R_KP_RPM / ROBOT_MM_S_PER_RPM
+    };
+
+    const float ki[2] =
+    {
+        WHEEL_L_KI_RPM / ROBOT_MM_S_PER_RPM,
+        WHEEL_R_KI_RPM / ROBOT_MM_S_PER_RPM
+    };
+
     for (uint8_t i = 0; i < 2; i++)
     {
         PID_Init(
             &speed_pid[i],
-            WHEEL_KP,
-            WHEEL_KI,
+            kp[i],
+            ki[i],
             0.0f,
             -100.0f,
             100.0f,
@@ -81,7 +94,11 @@ void WheelControl_Update(float dt)
 
     for (uint8_t i = 0; i < 2; i++)
     {
+#if (WHEEL_USE_FEEDFORWARD != 0)
         float ff   = MotorModel_DutyFromSpeed((Motor_ID_t)i, ref_speed[i]);
+#else
+        float ff   = 0.0f;
+#endif
         float err  = ref_speed[i] - Encoder_GetSpeed((Motor_ID_t)i);
         float trim;
 

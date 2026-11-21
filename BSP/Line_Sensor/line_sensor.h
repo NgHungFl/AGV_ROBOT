@@ -21,20 +21,20 @@
  * PHAI DO THUC TE SAU KHI NAP CODE.
  * ================================================= */
 
-#define LINE_S1_BLACK 145U
-#define LINE_S1_WHITE  85U
+#define LINE_S1_BLACK 130U
+#define LINE_S1_WHITE  87U
 
-#define LINE_S2_BLACK 145U
-#define LINE_S2_WHITE  85U
+#define LINE_S2_BLACK 129U
+#define LINE_S2_WHITE  88U
 
-#define LINE_S3_BLACK 150U
-#define LINE_S3_WHITE  85U
+#define LINE_S3_BLACK 143U
+#define LINE_S3_WHITE  87U
 
-#define LINE_S4_BLACK 170U
-#define LINE_S4_WHITE  85U
+#define LINE_S4_BLACK 130U
+#define LINE_S4_WHITE  87U
 
-#define LINE_S5_BLACK 190U
-#define LINE_S5_WHITE  103U
+#define LINE_S5_BLACK 132U
+#define LINE_S5_WHITE  90U
 
 /* Trong so tu trai sang phai */
 #define LINE_WEIGHT_S1 (-2000)

@@ -4,7 +4,22 @@
 #include <math.h>
 
 /* =================================================
- * BAM LINE = MOT BO PID, CAU TRUC DO LYAPUNOV QUYET DINH
+ * LINE_LAW_KANAYAMA (mac dinh, trung voi bao cao mo hinh hoa):
+ *
+ *   Mo hinh (5.11):  e2_dot = v*sin(e3) - w*(l + e1)
+ *                    e3_dot = w_R - w
+ *   Luat (5.13):     w = k2*e2*v + w_R + k3*sin(e3)
+ *   Ham Lyapunov:    V = (e1^2 + e2^2)/2 + (1 - cos e3)/k2
+ *   V_dot = -k1*e1^2 - (k3/k2)*sin^2(e3) - w*l*e2
+ *   Luu y: so hang -w*l*e2 khong xac dinh dau; bao cao bo qua no (l nho)
+ *   => on dinh o muc xap xi. Khi e1 = 0, V_dot chi nua xac dinh am nen
+ *   e2 -> 0 phai suy ra tu LaSalle / Barbalat voi v_R != 0.
+ *
+ *   Doi dau sang quy uoc code (duong = ben PHAI, w quay phai):
+ *      e2 = -d ,  e3 = theta ,  w_code = k2*d*v - k3*sin(theta)
+ *   e3 lay tu bo quan sat (co tinh den so hang l*w) thay cho (5.17).
+ *
+ * LINE_LAW_PID_LYAP: PID, CAU TRUC DO LYAPUNOV QUYET DINH
  *
  * Quy uoc: duong = ben PHAI.
  *   d     : vi tri line do duoc so voi tam hang mat (mm), d > 0 khi line ben phai
@@ -51,6 +66,7 @@ static float theta_hat;
 static uint8_t obs_ready;
 
 static float error_mm;
+static float speed_factor = 1.0f;
 static float omega_cmd;
 static float lost_time;
 
@@ -87,6 +103,13 @@ void LineTracking_Reset(void)
     error_mm  = 0.0f;
     omega_cmd = 0.0f;
     lost_time = 0.0f;
+
+    speed_factor = 1.0f;
+}
+
+float LineTracking_GetSpeedFactor(void)
+{
+    return speed_factor;
 }
 
 uint8_t LineTracking_IsLost(void)
@@ -160,6 +183,20 @@ float LineTracking_Compute(float dt, float v_mm_s, float omega_meas)
 
     theta_hat = Limit(theta_hat, 0.8f);
 
+#if (LINE_LAW == LINE_LAW_KANAYAMA)
+
+    /* ================= LUAT (5.13) =================
+       w = k2*e2*v + k3*sin(e3)  (e2 = -d_hat, e3 = theta_hat; dau doi sang
+       quy uoc quay phai).  v = v_R*cos(e3). */
+
+    omega_cmd = Limit(
+        (LINE_K2 * (-y_hat) * v_eff) - (LINE_K3 * sinf(theta_hat)),
+        LINE_OMEGA_MAX);
+
+    speed_factor = cosf(theta_hat);
+
+#else
+
     /* ================= PID (cau truc Lyapunov) =================
        error = d_hat = -y_hat
        deriv = -v*theta_hat : toc do thay doi cua d do goc lech xe */
@@ -169,6 +206,10 @@ float LineTracking_Compute(float dt, float v_mm_s, float omega_meas)
         -y_hat,
         -v_eff * theta_hat,
         dt);
+
+    speed_factor = 1.0f;
+
+#endif
 
     return omega_cmd;
 }
