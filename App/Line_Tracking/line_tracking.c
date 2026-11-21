@@ -176,12 +176,12 @@ float LineTracking_Compute(float dt, float v_mm_s, float omega_meas)
         obs_ready = 1;
     }
 
-    innov = y_meas - y_hat;
+    innov = Limit(y_meas - y_hat, OBS_INNOV_MAX_MM);
 
     y_hat     += dt * ((v_eff * theta_hat) + (LINE_L_MM * omega_meas) + (l1 * innov));
     theta_hat += dt * (omega_meas + (l2 * innov));
 
-    theta_hat = Limit(theta_hat, 0.8f);
+    theta_hat = Limit(theta_hat, OBS_THETA_MAX_RAD);
 
 #if (LINE_LAW == LINE_LAW_KANAYAMA)
 

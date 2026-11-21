@@ -102,7 +102,23 @@ void WheelControl_Update(float dt)
         float err  = ref_speed[i] - Encoder_GetSpeed((Motor_ID_t)i);
         float trim;
 
-        PID_SetLimits(&speed_pid[i], -100.0f - ff, 100.0f - ff);
+        float lo = -100.0f - ff;
+        float hi =  100.0f - ff;
+
+#if (WHEEL_NO_REVERSE_ON_DECEL != 0)
+        /* Giam toc khi dang tien: khong dao chieu dong co (tranh danh lui
+           roi roi vot xuong qua thap). Tong duty >= 0 khi v_ref > 0. */
+        if (ref_speed[i] > 5.0f)
+        {
+            lo = -ff;
+        }
+        else if (ref_speed[i] < -5.0f)
+        {
+            hi = -ff;
+        }
+#endif
+
+        PID_SetLimits(&speed_pid[i], lo, hi);
 
         trim = PID_Update(&speed_pid[i], err, 0.0f, dt);
 

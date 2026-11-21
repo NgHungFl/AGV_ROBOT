@@ -15,7 +15,9 @@
  * PA4 -> PA3 -> PA2 -> PA1 -> PA0
  * ================================================= */
 
-static uint16_t adc_buffer[LINE_SENSOR_COUNT];
+/* LINE_OVERSAMPLE lan quet lien tiep, moi lan quet 5 kenh:
+   adc_buffer[n * 5 + kenh] */
+static uint16_t adc_buffer[LINE_SENSOR_COUNT * LINE_OVERSAMPLE];
 
 /* Du lieu cam bien */
 static LineSensor_Data_t sensor_data;
@@ -102,6 +104,16 @@ static uint16_t LineSensor_Normalize(
     return (uint16_t)result;
 }
 
+/* Gia tri dong gop vao vi tri (trong so mem) */
+static uint32_t LineSensor_Contribution(uint16_t value)
+{
+#if (LINE_SOFT_WEIGHT != 0)
+    return (value > LINE_SOFT_FLOOR) ? (uint32_t)(value - LINE_SOFT_FLOOR) : 0U;
+#else
+    return (value >= LINE_DETECT_THRESHOLD) ? (uint32_t)value : 0U;
+#endif
+}
+
 /* =================================================
  * KHOI TAO LINE SENSOR
  * ================================================= */
@@ -129,7 +141,7 @@ HAL_StatusTypeDef LineSensor_Init(ADC_HandleTypeDef *hadc)
     if (HAL_ADC_Start_DMA(
             adc_handle,
             (uint32_t *)adc_buffer,
-            LINE_SENSOR_COUNT
+            LINE_SENSOR_COUNT * LINE_OVERSAMPLE
         ) != HAL_OK)
     {
         adc_handle = NULL;
@@ -157,11 +169,24 @@ void LineSensor_Update(void)
      * 1. DAO THU TU ADC DMA SANG THU TU VAT LY
      * ------------------------------------------------- */
 
-    sensor_data.raw[0] = adc_buffer[4];  // S1 - PA4
-    sensor_data.raw[1] = adc_buffer[3];  // S2 - PA3
-    sensor_data.raw[2] = adc_buffer[2];  // S3 - PA2
-    sensor_data.raw[3] = adc_buffer[1];  // S4 - PA1
-    sensor_data.raw[4] = adc_buffer[0];  // S5 - PA0
+    {
+        uint32_t sum[LINE_SENSOR_COUNT] = {0, 0, 0, 0, 0};
+
+        /* Trung binh LINE_OVERSAMPLE lan quet cho tung kenh */
+        for (uint32_t n = 0; n < LINE_OVERSAMPLE; n++)
+        {
+            for (uint32_t ch = 0; ch < LINE_SENSOR_COUNT; ch++)
+            {
+                sum[ch] += adc_buffer[(n * LINE_SENSOR_COUNT) + ch];
+            }
+        }
+
+        sensor_data.raw[0] = (uint16_t)(sum[4] / LINE_OVERSAMPLE);  // S1 - PA4
+        sensor_data.raw[1] = (uint16_t)(sum[3] / LINE_OVERSAMPLE);  // S2 - PA3
+        sensor_data.raw[2] = (uint16_t)(sum[2] / LINE_OVERSAMPLE);  // S3 - PA2
+        sensor_data.raw[3] = (uint16_t)(sum[1] / LINE_OVERSAMPLE);  // S4 - PA1
+        sensor_data.raw[4] = (uint16_t)(sum[0] / LINE_OVERSAMPLE);  // S5 - PA0
+    }
 
     /* -------------------------------------------------
      * 2. CHUAN HOA TUNG MAT
@@ -188,12 +213,29 @@ void LineSensor_Update(void)
             /* Binh thuong: trung binh tat ca mat thay line */
             for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
             {
-                if (sensor_data.value[i] >= LINE_DETECT_THRESHOLD)
-                {
-                    weighted_sum +=
-                        (int32_t)weights[i] * sensor_data.value[i];
+                uint32_t c = LineSensor_Contribution(sensor_data.value[i]);
 
-                    total_value += sensor_data.value[i];
+                weighted_sum += (int32_t)weights[i] * (int32_t)c;
+
+                total_value += c;
+            }
+
+            /* Khong mat nao vuot nguong phat hien -> mat line */
+            {
+                uint8_t seen = 0;
+
+                for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
+                {
+                    if (sensor_data.value[i] >= LINE_DETECT_THRESHOLD)
+                    {
+                        seen = 1;
+                    }
+                }
+
+                if (seen == 0)
+                {
+                    weighted_sum = 0;
+                    total_value  = 0;
                 }
             }
         }
@@ -250,10 +292,11 @@ void LineSensor_Update(void)
 
             for (int8_t i = first; (first >= 0) && (i <= last); i++)
             {
-                weighted_sum +=
-                    (int32_t)weights[i] * sensor_data.value[i];
+                uint32_t c = LineSensor_Contribution(sensor_data.value[i]);
 
-                total_value += sensor_data.value[i];
+                weighted_sum += (int32_t)weights[i] * (int32_t)c;
+
+                total_value += c;
             }
         }
     }

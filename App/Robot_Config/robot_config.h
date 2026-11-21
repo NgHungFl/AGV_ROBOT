@@ -19,7 +19,7 @@
 #define ROBOT_WHEEL_CIRCUMFERENCE_MM   200.0f
 
 /* Khoang cach giua 2 banh (tam banh - tam banh) - PHAI DO */
-#define ROBOT_TRACK_WIDTH_MM           210.0f
+#define ROBOT_TRACK_WIDTH_MM           130.0f
 
 /* l: khoang cach tu trung diem 2 banh (M) den tam day mat (C). Bao cao: 45.5 mm */
 #define ROBOT_SENSOR_DIST_MM           45.5f
@@ -63,15 +63,15 @@
  *      v = GAIN * (|duty| - DB)   khi |duty| > DB
  * Bao cao chua tinh vung chet nen DB = 0. Neu APP_MODE_DUTY_TEST do ra
  * DB > 0 thi dien vao day (feedforward chinh xac hon). */
-#define MOTOR_L_GAIN_FWD               (MOTOR_L_K_RPM_PER_PCT * ROBOT_MM_S_PER_RPM)
-#define MOTOR_L_DB_FWD                 0.0f
-#define MOTOR_L_GAIN_REV               (MOTOR_L_K_RPM_PER_PCT * ROBOT_MM_S_PER_RPM)
-#define MOTOR_L_DB_REV                 0.0f
+#define MOTOR_L_GAIN_FWD               12.0f       /* do tu SPEED_TEST: 150 -> 15.7 %, 300 -> 28.2 % */
+#define MOTOR_L_DB_FWD                 3.2f
+#define MOTOR_L_GAIN_REV               12.0f
+#define MOTOR_L_DB_REV                 3.2f
 
-#define MOTOR_R_GAIN_FWD               (MOTOR_R_K_RPM_PER_PCT * ROBOT_MM_S_PER_RPM)
-#define MOTOR_R_DB_FWD                 0.0f
-#define MOTOR_R_GAIN_REV               (MOTOR_R_K_RPM_PER_PCT * ROBOT_MM_S_PER_RPM)
-#define MOTOR_R_DB_REV                 0.0f
+#define MOTOR_R_GAIN_FWD               12.4f       /* 150 -> 14.7 %, 300 -> 26.8 % */
+#define MOTOR_R_DB_FWD                 2.6f
+#define MOTOR_R_GAIN_REV               12.4f
+#define MOTOR_R_DB_REV                 2.6f
 
 /* Neu duty DUONG ma banh quay LUI thi dat 1 (chi sua o day) */
 #define MOTOR_LEFT_REVERSE             0
@@ -96,11 +96,14 @@
    0: chi PI nhu bao cao */
 #define WHEEL_USE_FEEDFORWARD          1
 
+/* 1: khi giam toc luc dang tien, khong cho duty am (khong dao chieu dong co) */
+#define WHEEL_NO_REVERSE_ON_DECEL      1
+
 /* ================= BO TAO QUY DAO VAN TOC / DUNG VI TRI ================= */
 
-#define AGV_CRUISE_SPEED_MM_S          500.0f
-#define AGV_ACCEL_MM_S2                200.0f
-#define AGV_DECEL_MM_S2                200.0f
+#define AGV_CRUISE_SPEED_MM_S          400.0f
+#define AGV_ACCEL_MM_S2                250.0f
+#define AGV_DECEL_MM_S2                250.0f
 
 /* Phanh gap khi gap cuoi line */
 #define AGV_END_DECEL_MM_S2            1500.0f
@@ -118,8 +121,8 @@
 #define AGV_MIN_TRACK_SPEED_MM_S       100.0f
 
 /* Giam toc khi lech line lon */
-#define AGV_CURVE_SLOW_GAIN            0.35f
-#define AGV_CURVE_SLOW_REF_MM          25.0f
+#define AGV_CURVE_SLOW_GAIN            0.3f
+#define AGV_CURVE_SLOW_REF_MM          35.0f
 
 /* Mat line qua lau (ngoai vung cuoi) thi bao loi */
 #define AGV_LOST_TIMEOUT_S             0.40f
@@ -141,8 +144,8 @@
 #define LINE_LAW                       LINE_LAW_KANAYAMA
 
 /* Kanayama:  k2 [rad / mm^2],  k3 [rad / s]   (k2, k3 > 0) */
-#define LINE_K2                        2.0e-4f
-#define LINE_K3                        1.0f
+#define LINE_K2                        3.0e-4f
+#define LINE_K3                        2.0f
 
 /* PID_LYAP:  K [1/s], C (0..1), GAMMA [rad/s tren mm*s] */
 #define LYAP_K                         8.0f
@@ -151,17 +154,22 @@
 #define LYAP_I_LIMIT                   0.8f        /* rad/s */
 
 /* Bo quan sat (y, theta): tan so rieng va he so tat dan */
-#define OBS_WN                         19.0f
-#define OBS_ZETA                       1.0f
+#define OBS_WN                         12.0f
+#define OBS_ZETA                       0.9f
+
+/* Kep sai lech do (mm) dua vao bo quan sat: cac buoc nhay do 5 mat
+   luong tu hoa khong bi hieu thanh goc lech lon. Kep goc theta_hat (rad). */
+#define OBS_INNOV_MAX_MM               12.0f
+#define OBS_THETA_MAX_RAD              0.8f
 
 /* Van toc nho nhat dung trong bo quan sat (tranh chia cho 0) */
-#define OBS_V_MIN_MM_S                 60.0f
+#define OBS_V_MIN_MM_S                 150.0f
 
 /* Mat line: giu omega cu trong thoi gian nay roi ve 0 */
 #define LINE_LOST_HOLD_S               0.15f
 
 /* Gioi han toc do quay (rad/s) */
-#define LINE_OMEGA_MAX                 2.5f
+#define LINE_OMEGA_MAX                 10.0f
 
 /* ================= NHAN BIET HANG VA MAU ================= */
 
@@ -178,7 +186,7 @@
 #define LOAD_SAMPLE_PERIOD_MS          60U
 
 /* Phan biet mau: kenh troi hon kenh kia it nhat 1.3 lan */
-#define LOAD_COLOR_DOMINANCE_X10       12U
+#define LOAD_COLOR_DOMINANCE_X10       13U
 
 /* ================= NHIEM VU ================= */
 
@@ -190,7 +198,7 @@
 #define AGV_END_PATH_LENGTH_MM         4610.0f
 
 /* Vung cham truoc cuoi line */
-#define AGV_END_SLOW_DIST_MM           100.0f
+#define AGV_END_SLOW_DIST_MM           250.0f
 #define AGV_END_SLOW_SPEED_MM_S        100.0f
 
 /* Neu qua dich them quang nay ma van chua thay cuoi line thi dung */

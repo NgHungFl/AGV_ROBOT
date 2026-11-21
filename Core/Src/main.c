@@ -41,6 +41,7 @@
 #include "agv_mission.h"
 #include "control_timer.h"
 #include "motion_test.h"
+#include "line_calib.h"
 
 
 /* USER CODE END Includes */
@@ -62,8 +63,9 @@
 #define APP_MODE_LINE_SENSOR_TEST 5   /* in gia tri 5 mat do line */
 #define APP_MODE_COLOR_TEST       6   /* in R,G,B,C cam bien mau */
 #define APP_MODE_DUTY_TEST        7   /* B0: do mo hinh duty-toc do tung dong co */
+#define APP_MODE_LINE_CALIB       8   /* tu dong do BLACK/WHITE 5 mat */
 
-#define APP_MODE                  APP_MODE_MISSION 
+#define APP_MODE                  APP_MODE_MISSION
 
 /* USER CODE END PD */
 
@@ -121,7 +123,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-    HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -215,6 +217,10 @@ int main(void)
 
   MotionTest_Init(MOTION_TEST_DUTY);
 
+#elif (APP_MODE == APP_MODE_LINE_CALIB)
+
+  LineCalib_Init();
+
 #endif
 
   /* USER CODE END 2 */
@@ -250,6 +256,10 @@ int main(void)
 #elif (APP_MODE == APP_MODE_COLOR_TEST)
 
     ColorSensorTest_Run();
+
+#elif (APP_MODE == APP_MODE_LINE_CALIB)
+
+    LineCalib_Run();
 
 #endif
 
