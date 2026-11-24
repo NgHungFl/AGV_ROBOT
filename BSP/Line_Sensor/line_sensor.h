@@ -10,12 +10,12 @@
 #define LINE_SENSOR_COUNT 5U
 
 /* Nguong phat hien line: 0 - 1000 */
-#define LINE_DETECT_THRESHOLD 200U
+#define LINE_DETECT_THRESHOLD 350U
 
 /* So lan quet ADC lay trung binh moi lan cap nhat (DMA circular, 5*N mau).
    Nhieu giam ~ sqrt(N) lan. */
 #ifndef LINE_OVERSAMPLE
-#define LINE_OVERSAMPLE 16U
+#define LINE_OVERSAMPLE 36U
 #endif
 
 /* Trong so mem: mat co gia tri > FLOOR dong gop (value - FLOOR) vao vi tri,
@@ -33,8 +33,9 @@
  * BLACK: Gia tri ADC khi dat tren vach den.
  * WHITE: Gia tri ADC khi dat tren nen trang.
  *
- * CAC GIA TRI BEN DUOI CHI LA VI DU.
- * PHAI DO THUC TE SAU KHI NAP CODE.
+ * CAC GIA TRI BEN DUOI LA DU PHONG, KHONG PHAI CALIB THUC TE.
+ * Khi boot, chuong trinh nap gia tri tu FLASH hoac tu dong calibrate
+ * roi ghi vao RAM qua LineSensor_SetCalibration().
  * ================================================= */
 
 #define LINE_S1_BLACK 148U
@@ -102,5 +103,10 @@ void LineSensor_Update(void);
 void LineSensor_SetPreference(LinePreference_t pref);
 
 const LineSensor_Data_t *LineSensor_GetData(void);
+
+/* Nap calibration tu Flash sau khi kiem tra hop le. */
+HAL_StatusTypeDef LineSensor_SetCalibration(
+    const uint16_t white[LINE_SENSOR_COUNT],
+    const uint16_t black[LINE_SENSOR_COUNT]);
 
 #endif

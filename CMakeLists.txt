@@ -73,6 +73,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/AGV_Mission/agv_mission.c
     Test/Motion_Test/motion_test.c
     Test/Line_Calib/line_calib.c
+    App/Line_AutoCalib/line_auto_calib.c
+    App/Line_AutoCalib/line_calib_storage.c
 
     # Add user sources here
 )
@@ -107,6 +109,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     App/AGV_Mission
     Test/Motion_Test
     Test/Line_Calib
+    App/Line_AutoCalib
 
 
 

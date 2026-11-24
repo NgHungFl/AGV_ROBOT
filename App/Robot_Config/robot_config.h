@@ -19,7 +19,7 @@
 #define ROBOT_WHEEL_CIRCUMFERENCE_MM   200.0f
 
 /* Khoang cach giua 2 banh (tam banh - tam banh) - PHAI DO */
-#define ROBOT_TRACK_WIDTH_MM           130.0f
+#define ROBOT_TRACK_WIDTH_MM           200.0f
 
 /* l: khoang cach tu trung diem 2 banh (M) den tam day mat (C). Bao cao: 45.5 mm */
 #define ROBOT_SENSOR_DIST_MM           45.5f
@@ -144,8 +144,8 @@
 #define LINE_LAW                       LINE_LAW_KANAYAMA
 
 /* Kanayama:  k2 [rad / mm^2],  k3 [rad / s]   (k2, k3 > 0) */
-#define LINE_K2                        3.0e-4f
-#define LINE_K3                        2.0f
+#define LINE_K2                        2.5e-4f
+#define LINE_K3                        1.5f
 
 /* PID_LYAP:  K [1/s], C (0..1), GAMMA [rad/s tren mm*s] */
 #define LYAP_K                         8.0f
@@ -170,6 +170,24 @@
 
 /* Gioi han toc do quay (rad/s) */
 #define LINE_OMEGA_MAX                 10.0f
+
+/* ================= AUTO CALIB 2 MAU ================= */
+
+/* Chu ky lay mau ADC khi calib */
+#define LINE_AUTO_CALIB_SAMPLE_MS          50U
+
+/* 200 mau x 50 ms = 10 giay on dinh */
+#define LINE_AUTO_CALIB_STABLE_SAMPLES    200U
+
+/* Do dao dong ADC toi da trong cua so */
+#define LINE_AUTO_CALIB_STABLE_RANGE       10U
+
+/* Thoi gian cho toi da tung giai doan */
+#define LINE_AUTO_CALIB_WHITE_TIMEOUT_MS 20000U
+#define LINE_AUTO_CALIB_BLACK_TIMEOUT_MS 20000U
+
+/* Do tuong phan toi thieu giua den va trang */
+#define LINE_AUTO_CALIB_MIN_SPAN           25U
 
 /* ================= NHAN BIET HANG VA MAU ================= */
 

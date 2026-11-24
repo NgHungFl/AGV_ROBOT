@@ -28,7 +28,7 @@ static volatile LinePreference_t line_pref = LINE_PREF_NONE;
 static ADC_HandleTypeDef *adc_handle = NULL;
 
 /* Calibration BLACK */
-static const uint16_t black_calib[LINE_SENSOR_COUNT] =
+static uint16_t black_calib[LINE_SENSOR_COUNT] =
 {
     LINE_S1_BLACK,
     LINE_S2_BLACK,
@@ -38,7 +38,7 @@ static const uint16_t black_calib[LINE_SENSOR_COUNT] =
 };
 
 /* Calibration WHITE */
-static const uint16_t white_calib[LINE_SENSOR_COUNT] =
+static uint16_t white_calib[LINE_SENSOR_COUNT] =
 {
     LINE_S1_WHITE,
     LINE_S2_WHITE,
@@ -68,28 +68,30 @@ static const int16_t weights[LINE_SENSOR_COUNT] =
  * ADC den < ADC trang
  * ================================================= */
 
-static uint16_t LineSensor_Normalize(
-    uint16_t raw,
+/* Chuan hoa truc tiep tu TONG ADC
+ * WHITE = 0, BLACK = 1000
+ * Khong cat phan le trung binh truoc khi chuan hoa.
+ */
+static uint16_t LineSensor_NormalizeSum(
+    uint32_t raw_sum,
     uint16_t black,
-    uint16_t white
-)
+    uint16_t white)
 {
-    int32_t numerator;
-    int32_t denominator;
-    int32_t result;
+    int64_t denominator =
+        ((int64_t)black - (int64_t)white)
+        * LINE_OVERSAMPLE;
 
-    if (black == white)
+    if (denominator == 0)
     {
-        return 0;
+        return 0U;
     }
 
-    numerator =
-        ((int32_t)raw - (int32_t)white) * 1000;
+    int64_t numerator =
+        ((int64_t)raw_sum -
+         (int64_t)white * LINE_OVERSAMPLE)
+        * 1000;
 
-    denominator =
-        (int32_t)black - (int32_t)white;
-
-    result = numerator / denominator;
+    int64_t result = numerator / denominator;
 
     if (result < 0)
     {
@@ -166,40 +168,50 @@ void LineSensor_Update(void)
     }
 
     /* -------------------------------------------------
-     * 1. DAO THU TU ADC DMA SANG THU TU VAT LY
+
+    /* -------------------------------------------------
+     * 1. DOC ADC DMA VA CHUAN HOA 5 MAT
      * ------------------------------------------------- */
-
     {
-        uint32_t sum[LINE_SENSOR_COUNT] = {0, 0, 0, 0, 0};
+        uint32_t sum[LINE_SENSOR_COUNT] = {0U};
 
-        /* Trung binh LINE_OVERSAMPLE lan quet cho tung kenh */
-        for (uint32_t n = 0; n < LINE_OVERSAMPLE; n++)
+        /* Tinh tong LINE_OVERSAMPLE mau moi kenh */
+        for (uint32_t n = 0U; n < LINE_OVERSAMPLE; n++)
         {
-            for (uint32_t ch = 0; ch < LINE_SENSOR_COUNT; ch++)
+            for (uint32_t ch = 0U;
+                 ch < LINE_SENSOR_COUNT;
+                 ch++)
             {
-                sum[ch] += adc_buffer[(n * LINE_SENSOR_COUNT) + ch];
+                sum[ch] += adc_buffer[
+                    n * LINE_SENSOR_COUNT + ch
+                ];
             }
         }
 
-        sensor_data.raw[0] = (uint16_t)(sum[4] / LINE_OVERSAMPLE);  // S1 - PA4
-        sensor_data.raw[1] = (uint16_t)(sum[3] / LINE_OVERSAMPLE);  // S2 - PA3
-        sensor_data.raw[2] = (uint16_t)(sum[2] / LINE_OVERSAMPLE);  // S3 - PA2
-        sensor_data.raw[3] = (uint16_t)(sum[1] / LINE_OVERSAMPLE);  // S4 - PA1
-        sensor_data.raw[4] = (uint16_t)(sum[0] / LINE_OVERSAMPLE);  // S5 - PA0
+        /* ADC: PA0 -> PA4
+         * Cam bien: S1=PA4 -> S5=PA0
+         */
+        for (uint8_t i = 0U;
+             i < LINE_SENSOR_COUNT;
+             i++)
+        {
+            uint32_t adc_sum =
+                sum[LINE_SENSOR_COUNT - 1U - i];
+
+            /* RAW dung hien thi va hieu chuan */
+            sensor_data.raw[i] =
+                (uint16_t)(adc_sum / LINE_OVERSAMPLE);
+
+            /* VAL tinh truc tiep tu tong ADC */
+            sensor_data.value[i] =
+                LineSensor_NormalizeSum(
+                    adc_sum,
+                    black_calib[i],
+                    white_calib[i]
+                );
+        }
     }
 
-    /* -------------------------------------------------
-     * 2. CHUAN HOA TUNG MAT
-     * ------------------------------------------------- */
-
-    for (uint8_t i = 0; i < LINE_SENSOR_COUNT; i++)
-    {
-        sensor_data.value[i] = LineSensor_Normalize(
-            sensor_data.raw[i],
-            black_calib[i],
-            white_calib[i]
-        );
-    }
 
     /* -------------------------------------------------
      * 3. TINH TRUNG BINH CO TRONG SO
@@ -335,4 +347,31 @@ void LineSensor_SetPreference(LinePreference_t pref)
 const LineSensor_Data_t *LineSensor_GetData(void)
 {
     return &sensor_data;
+}
+
+/* Khong thay doi gia tri khi da bat vong TIM2 10 ms.
+ * Dung trong giai doan boot, truoc ControlTimer_Init(). */
+HAL_StatusTypeDef LineSensor_SetCalibration(
+    const uint16_t white[LINE_SENSOR_COUNT],
+    const uint16_t black[LINE_SENSOR_COUNT])
+{
+    if ((white == NULL) || (black == NULL)) { return HAL_ERROR; }
+
+    for (uint8_t i = 0U; i < LINE_SENSOR_COUNT; i++)
+    {
+        int32_t span = (int32_t)black[i] - (int32_t)white[i];
+        if (span < 0) { span = -span; }
+        if ((span < (int32_t)LINE_AUTO_CALIB_MIN_SPAN) ||
+        (white[i] >= 4095U) ||
+        (black[i] >= 4095U))
+        {
+            return HAL_ERROR;
+        }
+    }
+    for (uint8_t i = 0U; i < LINE_SENSOR_COUNT; i++)
+    {
+        white_calib[i] = white[i];
+        black_calib[i] = black[i];
+    }
+    return HAL_OK;
 }

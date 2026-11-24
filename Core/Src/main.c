@@ -42,6 +42,7 @@
 #include "control_timer.h"
 #include "motion_test.h"
 #include "line_calib.h"
+#include "line_auto_calib.h"
 
 
 /* USER CODE END Includes */
@@ -65,7 +66,7 @@
 #define APP_MODE_DUTY_TEST        7   /* B0: do mo hinh duty-toc do tung dong co */
 #define APP_MODE_LINE_CALIB       8   /* tu dong do BLACK/WHITE 5 mat */
 
-#define APP_MODE                  APP_MODE_MISSION
+#define APP_MODE                  APP_MODE_LINE_SENSOR_TEST /* SAFETY: test calib before mission */
 
 /* USER CODE END PD */
 
@@ -117,7 +118,13 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  /* Lay co reset TRUOC HAL_Init/SystemClock_Config, va xoa co de
+     lan reset tiep theo khong bi dinh co POR tu qua khu. */
+  uint32_t reset_flags = RCC->CSR;
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+  uint8_t manual_nrst =
+      ((reset_flags & RCC_CSR_PINRSTF) != 0U) &&
+      ((reset_flags & RCC_CSR_PORRSTF) == 0U);
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -156,6 +163,13 @@ int main(void)
   {
       BSP_UART_Printf("LINE SENSOR INIT FAILED\r\n");
       Error_Handler();
+  }
+
+  /* Calib chi chay tren NRST (hoac lan dau Flash chua co data).
+     Dong co chua khoi tao -> khong co chuyen dong tu dong. */
+  if (LineAutoCalib_Boot(manual_nrst) != HAL_OK)
+  {
+      LineAutoCalib_ErrorBlink();
   }
 
 #if (APP_MODE == APP_MODE_MISSION)
@@ -219,7 +233,7 @@ int main(void)
 
 #elif (APP_MODE == APP_MODE_LINE_CALIB)
 
-  LineCalib_Init();
+  BSP_UART_Printf("LINE CALIB completed at boot; press NRST to recalibrate\r\n");
 
 #endif
 
@@ -259,7 +273,8 @@ int main(void)
 
 #elif (APP_MODE == APP_MODE_LINE_CALIB)
 
-    LineCalib_Run();
+    LineSensor_Update();
+    HAL_Delay(100U);
 
 #endif
 
@@ -660,10 +675,20 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(ENBM_GPIO_Port, ENBM_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, L_IN1_Pin|L_IN2_Pin|R_IN1_Pin|R_IN2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED1_Pin */
+  GPIO_InitStruct.Pin = LED1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : ENBM_Pin */
   GPIO_InitStruct.Pin = ENBM_Pin;
