@@ -10,11 +10,13 @@
 #define LINE_TEST_INTERVAL_MS 100U
 
 static uint32_t last_print_time = 0;
+static uint32_t last_sample_time = 0;
 
 /* Khoi tao */
 void LineSensorTest_Init(void)
 {
     last_print_time = HAL_GetTick();
+    last_sample_time = last_print_time;
 
     BSP_UART_Printf("\r\n");
     BSP_UART_Printf("========================================\r\n");
@@ -52,18 +54,23 @@ static void LineSensorTest_PrintBar(
 void LineSensorTest_Run(void)
 {
     const LineSensor_Data_t *data;
+    uint32_t now = HAL_GetTick();
 
-    /* Cap nhat du lieu */
+    /* Lay mau theo chu ky dieu khien truoc khi loc vi tri. */
+    if ((now - last_sample_time) < ROBOT_CONTROL_PERIOD_MS)
+    {
+        return;
+    }
+    last_sample_time = now;
     LineSensor_Update();
 
     /* Gioi han toc do UART */
-    if ((HAL_GetTick() - last_print_time) <
-        LINE_TEST_INTERVAL_MS)
+    if ((now - last_print_time) < LINE_TEST_INTERVAL_MS)
     {
         return;
     }
 
-    last_print_time = HAL_GetTick();
+    last_print_time = now;
 
     data = LineSensor_GetData();
 
@@ -90,15 +97,17 @@ void LineSensorTest_Run(void)
     /* Vi tri line */
     if (data->status == LINE_DETECTED)
     {
+        BSP_UART_Printf("POS_RAW : %ld\r\n", (long)data->position);
         BSP_UART_Printf(
             "POS : %ld\r\n",
-            (long)data->position
+            (long)data->position_filtered
         );
 
         BSP_UART_Printf("STATE: LINE DETECTED\r\n");
     }
     else
     {
+        BSP_UART_Printf("POS_RAW : ---\r\n");
         BSP_UART_Printf("POS : ---\r\n");
         BSP_UART_Printf("STATE: LINE LOST\r\n");
     }

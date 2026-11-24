@@ -45,6 +45,7 @@ except serial.SerialException as e:
 
 raw_values = [0, 0, 0, 0, 0]
 normalized_values = [0, 0, 0, 0, 0]
+raw_position = None
 position = "---"
 state = "WAITING"
 
@@ -78,6 +79,10 @@ try:
             if values is not None:
                 normalized_values = values
 
+            raw_pos_match = re.search(r"^POS_RAW\s*:\s*(-?\d+|---)", line)
+            if raw_pos_match:
+                raw_position = raw_pos_match.group(1)
+
             pos_match = re.search(r"POS\s*:\s*(-?\d+|---)", line)
             if pos_match:
                 position = pos_match.group(1)
@@ -95,6 +100,8 @@ try:
                 print("RAW       :", " ".join(f"{x:5d}" for x in raw_values))
                 print("NORMALIZED:", " ".join(f"{x:5d}" for x in normalized_values))
                 print("--------------------------------")
+                if raw_position is not None:
+                    print(f"POS_RAW      : {raw_position}")
                 print(f"LINE POSITION: {position}")
                 print(f"LINE STATUS  : {state}")
                 print("--------------------------------")

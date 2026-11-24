@@ -164,7 +164,7 @@ float LineTracking_Compute(float dt, float v_mm_s, float omega_meas)
     lost_time = 0.0f;
 
     /* d: vi tri line (mm), duong = ben phai */
-    error_mm = LINE_POSITION_TO_MM(data->position);
+    error_mm = LINE_POSITION_TO_MM(data->position_filtered);
     y_meas   = -error_mm;
 
     /* ================= BO QUAN SAT ================= */

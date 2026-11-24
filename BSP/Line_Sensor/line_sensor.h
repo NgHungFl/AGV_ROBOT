@@ -89,7 +89,8 @@ typedef struct
 
     uint16_t value[LINE_SENSOR_COUNT];
 
-    int32_t position;
+    int32_t position;           /* Vi tri vua do */
+    int32_t position_filtered;  /* Vi tri sau bo loc EMA */
 
     LineStatus_t status;
 

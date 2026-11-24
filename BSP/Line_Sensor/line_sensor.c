@@ -2,6 +2,8 @@
 #include "line_sensor.h"
 #include <string.h>
 
+#define LINE_POSITION_EMA_ALPHA 0.5f
+
 /* =================================================
  * ADC DMA BUFFER
  *
@@ -21,6 +23,9 @@ static uint16_t adc_buffer[LINE_SENSOR_COUNT * LINE_OVERSAMPLE];
 
 /* Du lieu cam bien */
 static LineSensor_Data_t sensor_data;
+static float position_ema;
+static LinePreference_t position_ema_pref;
+static uint8_t position_ema_ready;
 
 static volatile LinePreference_t line_pref = LINE_PREF_NONE;
 
@@ -131,6 +136,7 @@ HAL_StatusTypeDef LineSensor_Init(ADC_HandleTypeDef *hadc)
 
     memset(adc_buffer, 0, sizeof(adc_buffer));
     memset(&sensor_data, 0, sizeof(sensor_data));
+    position_ema_ready = 0U;
 
     /* Hieu chuan ADC cho STM32F1 */
     if (HAL_ADCEx_Calibration_Start(adc_handle) != HAL_OK)
@@ -161,6 +167,7 @@ void LineSensor_Update(void)
 {
     int32_t weighted_sum = 0;
     uint32_t total_value = 0;
+    const LinePreference_t pref = line_pref;
 
     if (adc_handle == NULL)
     {
@@ -169,7 +176,7 @@ void LineSensor_Update(void)
 
     /* -------------------------------------------------
 
-    /* -------------------------------------------------
+    /* ------------------------------------------------
      * 1. DOC ADC DMA VA CHUAN HOA 5 MAT
      * ------------------------------------------------- */
     {
@@ -218,8 +225,6 @@ void LineSensor_Update(void)
      * ------------------------------------------------- */
 
     {
-        LinePreference_t pref = line_pref;
-
         if (pref == LINE_PREF_NONE)
         {
             /* Binh thuong: trung binh tat ca mat thay line */
@@ -321,12 +326,27 @@ void LineSensor_Update(void)
     {
         sensor_data.status = LINE_LOST;
         sensor_data.position = 0;
+        sensor_data.position_filtered = 0;
+        position_ema_ready = 0U;
     }
     else
     {
         sensor_data.position =
             weighted_sum / (int32_t)total_value;
 
+        if ((position_ema_ready == 0U) || (pref != position_ema_pref))
+        {
+            position_ema = (float)sensor_data.position;
+            position_ema_pref = pref;
+            position_ema_ready = 1U;
+        }
+        else
+        {
+            position_ema += LINE_POSITION_EMA_ALPHA *
+                            ((float)sensor_data.position - position_ema);
+        }
+
+        sensor_data.position_filtered = (int32_t)position_ema;
         sensor_data.status = LINE_DETECTED;
     }
 }
@@ -373,5 +393,6 @@ HAL_StatusTypeDef LineSensor_SetCalibration(
         white_calib[i] = white[i];
         black_calib[i] = black[i];
     }
+    position_ema_ready = 0U;
     return HAL_OK;
 }
