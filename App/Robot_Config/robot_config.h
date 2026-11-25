@@ -101,9 +101,9 @@
 
 /* ================= BO TAO QUY DAO VAN TOC / DUNG VI TRI ================= */
 
-#define AGV_CRUISE_SPEED_MM_S          500.0f
-#define AGV_ACCEL_MM_S2                800.0f
-#define AGV_DECEL_MM_S2                800.0f
+#define AGV_CRUISE_SPEED_MM_S          400.0f
+#define AGV_ACCEL_MM_S2                500.0f
+#define AGV_DECEL_MM_S2                500.0f
 
 /* Phanh gap khi gap cuoi line */
 #define AGV_END_DECEL_MM_S2            1500.0f
@@ -147,7 +147,7 @@
 
 /* Kanayama:  k2 [rad / mm^2],  k3 [rad / s]   (k2, k3 > 0) */
 #define LINE_K2                        2.5e-4f
-#define LINE_K3                        1.5f
+#define LINE_K3                        1.0f
 
 /* PID_LYAP:  K [1/s], C (0..1), GAMMA [rad/s tren mm*s] */
 #define LYAP_K                         8.0f
@@ -220,8 +220,8 @@
 #define AGV_END_PATH_LENGTH_MM         4610.0f
 
 /* Vung cham truoc cuoi line */
-#define AGV_END_SLOW_DIST_MM           250.0f
-#define AGV_END_SLOW_SPEED_MM_S        100.0f
+#define AGV_END_SLOW_DIST_MM           150.0f
+#define AGV_END_SLOW_SPEED_MM_S        150.0f
 
 /* Neu qua dich them quang nay ma van chua thay cuoi line thi dung */
 #define AGV_END_OVERRUN_MM             200.0f
