@@ -101,7 +101,7 @@
 
 /* ================= BO TAO QUY DAO VAN TOC / DUNG VI TRI ================= */
 
-#define AGV_CRUISE_SPEED_MM_S          400.0f
+#define AGV_CRUISE_SPEED_MM_S          500.0f
 #define AGV_ACCEL_MM_S2                800.0f
 #define AGV_DECEL_MM_S2                800.0f
 
@@ -142,7 +142,7 @@
 #define LINE_LAW                       LINE_LAW_STATE_FEEDBACK
 
 /* Chuong 5: k2 [rad/(s*mm)], k3 [rad/s], w = -k2*e2_hat - k3*sin(e3_hat). */
-#define LINE_STATE_K2                  0.095f
+#define LINE_STATE_K2                  0.09f
 #define LINE_STATE_K3                  6.0f
 
 /* Kanayama:  k2 [rad / mm^2],  k3 [rad / s]   (k2, k3 > 0) */
@@ -156,7 +156,7 @@
 #define LYAP_I_LIMIT                   0.8f        /* rad/s */
 
 /* Bo quan sat (eC, theta): tan so rieng (rad/s) va he so tat dan. */
-#define OBS_STATE_WN                   10.0f       /* Luat Chuong 5 */
+#define OBS_STATE_WN                   18.0f       /* Luat Chuong 5 */
 #define OBS_WN                         12.0f       /* Cac luat cu */
 #define OBS_ZETA                       0.95f
 

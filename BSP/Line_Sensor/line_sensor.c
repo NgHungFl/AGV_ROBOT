@@ -2,7 +2,7 @@
 #include "line_sensor.h"
 #include <string.h>
 
-#define LINE_POSITION_EMA_ALPHA 0.7f
+#define LINE_POSITION_EMA_ALPHA 0.55f
 
 /* =================================================
  * ADC DMA BUFFER
