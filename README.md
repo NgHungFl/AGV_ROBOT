@@ -10,7 +10,7 @@ Robot la xe AGV hai banh vi sai, dung STM32F103xB va STM32 HAL. Firmware dang co
 
 - Doc 5 mat line bang ADC1 scan + DMA.
 - Doc encoder rieng cho banh trai va banh phai.
-- Bam line bang bo PID co cau truc Lyapunov va observer uoc luong do lech/goc.
+- Bam line bang phan hoi trang thai theo Lyapunov va bo quan sat Luenberger.
 - Dieu khien toc do tung banh bang feed-forward theo model dong co ket hop PI.
 - Doc cam bien mau TCS34725, phat hien co hang va phan loai do/xanh.
 - Chay cac doan duong, giam toc, re nhanh theo mau va dung tai cuoi line.
@@ -189,111 +189,57 @@ $$
 
 `W` la `ROBOT_TRACK_WIDTH_MM`. Voi cau hinh hien tai, 11 PPR x4 x ti so truyen 30 = 1320 count/vong va chu vi 200 mm thi code tinh xap xi 0.1515 mm/count. Hay do chu vi banh va xac minh chieu encoder tren robot that.
 
-## 6. Bam line: observer va PID cau truc Lyapunov
+## 6. Bám line theo mô hình Chương 5
 
-Module: `App/Line_Tracking/line_tracking.c`.
+Chế độ mặc định `LINE_LAW_STATE_FEEDBACK` dùng luật (5.27). `M` là trung điểm trục bánh, `C` là tâm dãy cảm biến và `l` là khoảng cách từ `M` tới `C`. Firmware quy ước chiều dương về **phải** cho sai số ngang, sai số góc và tốc độ quay. Đổi dấu cả ba đại lượng khi đối chiếu với quy ước dương về trái của Chương 5.
 
-### 6.1. Ky hieu va mo hinh
+Dãy 5 mắt trả về vị trí vạch `d` so với tâm `C`. Ở đoạn thẳng với góc nhỏ, sai số tại `C` xấp xỉ `−d`. Bộ quan sát lưu `eC_hat` và `theta_hat`, rồi tính `e2_hat = eC_hat − l*theta_hat` để phản hồi tại `M`. Lệnh quay theo (5.27) là $\omega_{\rm cmd}=-k_2\hat e_2-k_3\sin(\hat\theta)$.
 
-- `d`: vi tri line so voi tam day cam bien, duong khi line o ben phai.
-- `y = -d`: sai lech ngang cua xe so voi line.
-- `theta`: goc huong xe so voi tiep tuyen line, duong khi lech phai.
-- `v`: toc do tien xe.
-- `omega`: toc do quay phai.
-- `L`: khoang cach tu truc banh den day cam bien, bang `ROBOT_SENSOR_DIST_MM`.
-- `b`: nhieu/goc quay hang so, gom anh huong do cong line va lech hai banh.
-- `kappa`: do cong cua line.
+### Bộ quan sát
 
-Mo hinh dong hoc duoc ghi trong source:
+Encoder cung cấp `v_M=(vL+vR)/2` và tốc độ quay phải `omega_meas=(vL−vR)/W`. Với sai lệch đo trừ dự đoán `epsilon = −d − eC_hat` sau khi kẹp, firmware tích phân Euler với bước `dt`:
 
 $$
-\dot y = v\theta + L(\omega+b)
+\begin{aligned}
+\hat e_{C,k+1} &= \hat e_{C,k} + dt\,[v_M\hat\theta_k+l\,\omega_{\rm meas}+(2\zeta_o\omega_o)\epsilon_k],\\
+\hat\theta_{k+1} &= \hat\theta_k + dt\,[\omega_{\rm meas}+L_2\epsilon_k].
+\end{aligned}
 $$
 
-$$
-\dot\theta = \omega+b-v\kappa
-$$
+Gain hiệu chỉnh của `eC_hat` bằng `L1 + l*L2` theo (5.18). Khi `v_M` từ `OBS_V_MIN_MM_S` trở lên, `L2 = ωo²/v_M`. Dưới ngưỡng này, firmware dùng `L2 = ωo²*v_M/OBS_V_MIN_MM_S²` cho chuyển động tiến để hiệu chỉnh góc giảm dần về 0 khi xe dừng. Khi mất vạch, bộ quan sát chỉ dự đoán từ encoder và giữ lệnh quay tối đa `LINE_LOST_HOLD_S`. Sau đó lệnh quay về 0 và bộ quan sát khởi tạo lại ở lần thấy vạch tiếp theo.
 
-Luật Lyapunov duoc dung lam co so cho bo dieu khien:
+### Chọn hệ số
 
-$$
-\omega =
--\frac{K y + v\hat{\theta}}{L}
--\hat b,
-\qquad
-\dot{\hat b} = \Gamma y
-$$
+- `LINE_STATE_K2` tác động lên sai số ngang tại `M`. `LINE_STATE_K3` tác động lên góc lệch. Theo (5.26), ở vận tốc thiết kế $v_0$, có thể lấy $k_2=\omega_c^2/v_0$ và $k_3=2\zeta_c\omega_c$ để chọn bộ gain thử ban đầu.
+- Với $v_0=500$ mm/s và bộ gain hiện tại, mô hình tuyến tính lý tưởng cho $\omega_c\approx8.94$ rad/s và $\zeta_c\approx0.335$. `OBS_STATE_WN` và `OBS_ZETA` tương ứng với $\omega_o=16$ rad/s và $\zeta_o=0.9$. Tại tốc độ này, $L_2=0.512$ rad/(mm·s) và $L_1\approx5.50$ s⁻¹.
+- `AGV_Motion` giới hạn thêm lệnh quay theo $|\omega|\leq 2v_{\rm cmd}/W$ để bánh trong không có tốc độ đặt âm. Vận tốc tiến đến từ motion profile và hệ số giảm tốc theo độ lệch vạch.
+- Chứng minh Lyapunov trong Chương 5 xét đoạn thẳng, tốc độ tiến dương không đổi và phản hồi trạng thái lý tưởng. Trên cua, góc tiếp tuyến thay đổi và luật hiện hành không có bù độ cong của vạch. Đánh giá đáp ứng trên cua bằng mô phỏng và thử xe.
 
-Voi `d = -y`, code viet lai theo cac thanh phan PID:
+Hai chế độ `LINE_LAW_KANAYAMA` và `LINE_LAW_PID_LYAP` có bộ gain riêng. Khi thử cấu hình cũ, đổi `LINE_LAW` để dùng đúng quy ước và đơn vị của các gain cũ.
 
-$$
-\omega =
-\frac{K}{L}d
-+\frac{C}{L}(-v\hat{\theta})
-+\Gamma\int d\,dt
-$$
+### Chạy mô phỏng và kiểm chứng
 
-Do do he so duoc khoi tao trong `LineTracking_Reset()` la:
+Dùng Python 3 và GCC cho máy tính. Ví dụ PowerShell với GCC (MSYS2 UCRT64) trong `PATH`:
 
-$$
-K_p=\frac{\mathrm{LYAP\_K}}{L},
-\qquad
-K_i=\mathrm{LYAP\_GAMMA},
-\qquad
-K_d=\frac{\mathrm{LYAP\_C}}{L}
-$$
+```powershell
+python Tools/Python/Sim/build.py build/sim/chapter5.exe
+python Tools/Python/Sim/build.py build/sim/kanayama.exe '-DLINE_LAW=LINE_LAW_KANAYAMA'
+.\build\sim\chapter5.exe blue offset=-15 heading=-8 csv=build/sim/chapter5.csv
+.\build\sim\kanayama.exe blue offset=-15 heading=-8
+```
 
-`PID_Update()` nhan error `-y_hat` va dao ham uoc luong `-v_eff * theta_hat`. Thanh phan D khong tinh bang sai phan noise cua cam bien; no dung goc uoc luong cua observer.
+Để thử giá trị khác, truyền `-DLINE_STATE_K2=…`, `-DLINE_STATE_K3=…`, `-DOBS_STATE_WN=…` hoặc `-DAGV_CRUISE_SPEED_MM_S=…` khi build mô phỏng. `offset` là độ lệch ban đầu của `C` tính bằng mm, `heading` tính bằng độ, cả hai dương về phải. `L` và `W` thay đổi kích thước của xe mô phỏng để thử sai lệch so với cấu hình firmware. `blue` chọn nhánh xanh, mặc định là nhánh đỏ.
 
-Ham Lyapunov mo ta trong comment:
+Bảng ghi trung bình RMS của 7 tình huống ở mỗi tốc độ hành trình, với gia tốc và giảm tốc 500 mm/s². Các tình huống gồm hai nhánh, lệch ban đầu, sai lệch kích thước và sai khác động cơ. Sai số tính theo khoảng cách từ tâm dãy mắt đến tim vạch trên đường dự kiến khi còn bám line.
 
-$$
-V = \frac{y^2}{2}
-+\frac{L}{2\Gamma}\tilde b^2
-$$
+| Tốc độ hành trình đặt (mm/s) | RMS luật cũ (mm) | RMS luật (5.27) (mm) |
+|---:|---:|---:|
+| 250 | 5.11 | 2.48 |
+| 325 | 6.02 | 2.83 |
+| 400 | 6.70 | 3.40 |
+| 500 | 7.24 | 4.68 |
 
-Voi cac gia thiet cua mo hinh, `C = 1` va uoc luong `theta` chinh xac:
-
-$$
-\dot V = -K y^2 \le 0
-$$
-
-Day la ket qua ly thuyet lien tuc theo cac gia thiet tren; firmware la he roi rac 10 ms, co gioi han dau ra, sai so sensor, sai lech motor va observer. Cau hinh hien tai dat `LYAP_C = 0.8`, khong phai 1; khong nen hieu dong thoi gian dam bao `V_dot = -K*y^2` cua truong hop C=1 ap dung nguyen ven cho robot that.
-
-### 6.2. Observer Luenberger
-
-Goc `theta` khong duoc do truc tiep. Observer cap nhat `y_hat` va `theta_hat` tu vi tri line, toc do xe va toc do quay do encoder. Sai so innovation:
-
-$$
-\tilde y = y_{\mathrm{meas}}-\hat y
-$$
-
-He so observer:
-
-$$
-l_1=2\zeta\omega_n,
-\qquad
-l_2=\frac{\omega_n^2}{v_{\mathrm{eff}}}
-$$
-
-Cap nhat dang roi rac trong code:
-
-$$
-\hat y_{k+1} =
-\hat y_k + dt
-\left(v_{\mathrm{eff}}\hat\theta
-+L\omega_{\mathrm{meas}}+l_1\tilde y\right)
-$$
-
-$$
-\hat\theta_{k+1} =
-\hat\theta_k + dt
-\left(\omega_{\mathrm{meas}}+l_2\tilde y\right)
-$$
-
-`v_eff` duoc chan khong thap hon `OBS_V_MIN_MM_S` de tranh chia cho toc do gan 0. `theta_hat` bi gioi han trong khoang +/-0.8 rad.
-
-Khi mat line, observer tam thoi du doan tu encoder ma khong co innovation. `omega_cmd` giu gia tri truoc toi da `LINE_LOST_HOLD_S`, sau do duoc dat ve 0. `AGV_Motion` co timeout rieng `AGV_LOST_TIMEOUT_S` de bao loi neu mat line qua lau o ngoai vung cuoi.
+Bộ gain trên hoàn thành 28/28 lượt và không mất vạch trong khoảng bám được tính. Mô phỏng dùng mô hình động cơ bậc nhất, encoder và dãy cảm biến giả lập. Kết quả dùng để chọn bộ gain khởi đầu cho xe thật.
 
 ## 7. Quy dao van toc va dong hoc hai banh
 
@@ -402,7 +348,7 @@ $$
 
 ### 8.2. PI toc do
 
-Moi banh co doi tuong PID/state rieng, nhung hien tai ca hai duoc khoi tao bang cung `WHEEL_KP`, `WHEEL_KI`, `WHEEL_INTEGRAL_LIMIT`. Wheel controller khong dung thanh phan D (`Kd=0`).
+Moi banh co gain PI rieng theo rpm. Code chia gain theo `ROBOT_MM_S_PER_RPM` de dung sai so mm/s. Hai banh dung cung `WHEEL_INTEGRAL_LIMIT`.
 
 $$
 e_i=v_{i,\mathrm{ref}}-v_{i,\mathrm{encoder}}
@@ -480,8 +426,8 @@ Thong so chinh nam trong `App/Robot_Config/robot_config.h`; calibration 5 mat li
 | `ROBOT_CONTROL_PERIOD_MS` | Chu ky TIM2 | 10 ms |
 | `ROBOT_CONTROL_DT_S` | `dt` truyen vao controller | 0.010 s |
 | `ROBOT_WHEEL_CIRCUMFERENCE_MM` | Chu vi banh trong odometry | 200 mm |
-| `ROBOT_TRACK_WIDTH_MM` | Khoang cach tam hai banh | 130 mm, can do |
-| `ROBOT_SENSOR_DIST_MM` | Khoang cach truc banh den hang mat | 100 mm, can do |
+| `ROBOT_TRACK_WIDTH_MM` | Khoang cach tam hai banh | 200 mm, can do |
+| `ROBOT_SENSOR_DIST_MM` | Khoang cach truc banh den hang mat | 45.5 mm |
 | `ROBOT_SENSOR_PITCH_MM` | Khoang cach giua hai mat line | 15 mm |
 
 ### Encoder va motor
@@ -496,29 +442,30 @@ Thong so chinh nam trong `App/Robot_Config/robot_config.h`; calibration 5 mat li
 | `MOTOR_L/R_GAIN_FWD/REV` | Gain model moi banh/chieu | Rieng tung banh |
 | `MOTOR_L/R_DB_FWD/REV` | Deadband model moi banh/chieu | Rieng tung banh |
 | `MOTOR_LEFT_REVERSE`, `MOTOR_RIGHT_REVERSE` | Dao chieu dau duty phan cung | 0 |
-| `WHEEL_KP`, `WHEEL_KI` | He so PI toc do chung hai banh | 0.436, 7.5 |
+| `WHEEL_L_KP_RPM`, `WHEEL_L_KI_RPM` | He so PI banh trai, sai so theo rpm | 0.50643, 5.7877 |
+| `WHEEL_R_KP_RPM`, `WHEEL_R_KI_RPM` | He so PI banh phai, sai so theo rpm | 0.50218, 5.2861 |
 | `WHEEL_INTEGRAL_LIMIT` | Gioi han tich phan PI toc do | 40% |
 
 ### Van toc va bam line
 
 | Macro | Y nghia | Gia tri hien tai |
 |---|---|---:|
-| `AGV_CRUISE_SPEED_MM_S` | Toc do cruise mac dinh | 300 mm/s |
-| `AGV_ACCEL_MM_S2` | Gioi han tang toc | 400 mm/s^2 |
+| `AGV_CRUISE_SPEED_MM_S` | Toc do cruise mac dinh | 500 mm/s |
+| `AGV_ACCEL_MM_S2` | Gioi han tang toc | 500 mm/s^2 |
 | `AGV_DECEL_MM_S2` | Giam toc thong thuong | 500 mm/s^2 |
 | `AGV_END_DECEL_MM_S2` | Giam toc khi da latch cuoi line | 1500 mm/s^2 |
 | `AGV_POS_GAIN_KS` | He so luat dung tuyen tinh gan dich | 8 |
-| `AGV_STOP_FLOOR_MM_S` | Toc do floor motion profile | 45 mm/s |
+| `AGV_STOP_FLOOR_MM_S` | Toc do floor motion profile | 30 mm/s |
 | `AGV_STOP_TOL_MM` | Sai so vi tri xem la da den | 1 mm |
 | `AGV_MIN_TRACK_SPEED_MM_S` | Toc do toi thieu khi bam line | 100 mm/s |
-| `AGV_CURVE_SLOW_GAIN` | Muc giam toc theo do lech | 0.35 |
-| `AGV_CURVE_SLOW_REF_MM` | Do lech de dat muc giam toc toi da | 25 mm |
-| `LYAP_K`, `LYAP_C`, `LYAP_GAMMA` | Tham so PID bam line | 8, 0.8, 0.010 |
-| `LYAP_I_LIMIT` | Gioi han tich phan bam line | 0.8 rad/s |
-| `OBS_WN`, `OBS_ZETA` | Tan so va damping observer | 25, 0.9 |
-| `OBS_V_MIN_MM_S` | Toc do toi thieu dung tinh observer | 60 mm/s |
+| `AGV_CURVE_SLOW_GAIN` | Muc giam toc theo do lech | 0.30 |
+| `AGV_CURVE_SLOW_REF_MM` | Do lech de dat muc giam toc toi da | 35 mm |
+| `LINE_STATE_K2`, `LINE_STATE_K3` | Gain ngang tai M va gain goc cua (5.27) | 0.16 rad/(s·mm), 6 rad/s |
+| `OBS_STATE_WN`, `OBS_ZETA` | Tan so rieng va he so tat dan cua bo quan sat | 16 rad/s, 0.9 |
+| `OBS_V_MIN_MM_S` | Moc toc do de giam hieu chinh goc | 150 mm/s |
+| `OBS_INNOV_MAX_MM`, `OBS_THETA_MAX_RAD` | Gioi han sai lech do du doan va goc uoc luong | 12 mm, 0.8 rad |
 | `LINE_LOST_HOLD_S` | Thoi gian giu omega khi mat line | 0.15 s |
-| `LINE_OMEGA_MAX` | Gioi han toc do quay line controller | 6 rad/s |
+| `LINE_OMEGA_MAX` | Gioi han toc do quay line controller | 10 rad/s |
 | `AGV_LOST_TIMEOUT_S` | Timeout mat line ngoai vung cuoi | 0.40 s |
 
 ### Line sensor, mau va duong nhiem vu
@@ -559,15 +506,16 @@ Chon mode bang macro `APP_MODE` trong `Core/Src/main.c`, build va nap firmware l
 | 5 | `APP_MODE_LINE_SENSOR_TEST` | In RAW, normalized, vi tri va line status. |
 | 6 | `APP_MODE_COLOR_TEST` | In RGB/C va ket qua classifier helper cua TCS34725. |
 | 7 | `APP_MODE_DUTY_TEST` | Do model duty-toc do cho trai/phai va tien/lui. |
+| 8 | `APP_MODE_LINE_CALIB` | Đo nền trắng và vạch đen cho 5 mắt, lưu hiệu chuẩn vào flash. |
 
 Trinh tu hieu chuan de de khoanh vung loi:
 
-1. **Line sensor (`5`)**: dat tung mat tren trang/den, sua BLACK/WHITE va threshold; xac minh thu tu S1..S5 va dau `POS`.
+1. Dùng mode hiệu chuẩn (`8`) trên đúng nền và vạch. Dùng mode cảm biến (`5`) để kiểm tra thứ tự S1–S5 và `POS` dương khi vạch nằm bên phải xe.
 2. **Encoder (`1`)**: xoay tay tung banh dung chieu; count phai tang khi banh quay theo chieu tien da quy uoc. Xac minh encoder trai/phai khong bi doi.
 3. **Model motor (`7`)**: chi test khi ke banh khoi san; chay het ca bon to hop motor/chieu, dung `GAIN/DB` in ra de cap nhat config.
 4. **Vong toc do (`2`)**: so sanh `ref`, `vL`, `vR`, duty. Sau khi model feed-forward on dinh moi tinh chinh PI.
 5. **Chay thang (`3`)**: kiem tra dau encoder, toc do hai banh va odometry.
-6. **Bam line (`4`)**: khi cac test phia tren da dat, tinh chinh sensor geometry, observer va line controller.
+6. Đo lại `ROBOT_TRACK_WIDTH_MM` và `ROBOT_SENSOR_DIST_MM`. Đặt `AGV_CRUISE_SPEED_MM_S` ở 250 mm/s cho bản test mode (`4`). Chạy trên đoạn thẳng với độ lệch nhẹ về hai phía, rồi qua cua và tăng dần đến tốc độ nhiệm vụ 500 mm/s khi xe bám ổn định. Dùng cùng vạch và điều kiện khởi đầu khi so sánh hai bộ gain. Nếu `w100` đổi dấu nhanh theo `th1000` trong khi `d10` ít đổi, thử giảm `OBS_STATE_WN`. Nếu hồi tâm chậm, tăng `LINE_STATE_K2` từng bước nhỏ và theo dõi dao động. Nếu sai số vượt qua tim vạch nhiều lần và `w100` chưa chạm giới hạn, thử tăng `LINE_STATE_K3`.
 7. **Nhiem vu (`0`)**: cuoi cung moi chinh quang duong khu hang, nhanh mau va diem ket thuc.
 
 `APP_MODE_MOTOR_TEST` chua duoc khai bao trong `main.c`; `Test/Motor_Test/motor_test.c` co ham test motor rieng nhung khong duoc goi boi cac nhanh mode hien tai.
@@ -578,7 +526,7 @@ UART3 duoc truu tuong hoa boi `BSP/UART/bsp_uart.c`; cac test va mission in ket 
 
 - Encoder test: `CNT_L`, `CNT_R`, `DIST_L`, `DIST_R`, `V_L`, `V_R`.
 - Speed test: `t_ms,ref,vL,vR,duL_x10,duR_x10`.
-- Follow/mission: quang duong, `VREF`, toc do do, line error (`D10`), omega (`W100`) va heading estimate (`TH1000`).
+- Follow test ở USART3, 115200 baud. `d10/10` là vị trí vạch so với C (mm), `eM10/10` là sai số ước lượng tại M (mm), `th1000/1000` là góc ước lượng (rad). Chia `w100` và `wmeas100` cho 100 để so sánh lệnh quay và tốc độ quay đo được (rad/s). `line=1` nghĩa là có vạch, `line=0` là mất vạch.
 - Cho hang: Clear/R/G/B, baseline, threshold va `PRESENT`.
 
 Float trong mot so log duoc nhan scale va ep sang so nguyen de phu hop cau hinh newlib-nano. Vi du `D10` can chia 10 de ra mm; `W100` can chia 100 de ra rad/s; `TH1000` can chia 1000 de ra rad.

@@ -66,7 +66,7 @@
 #define APP_MODE_DUTY_TEST        7   /* B0: do mo hinh duty-toc do tung dong co */
 #define APP_MODE_LINE_CALIB       8   /* tu dong do BLACK/WHITE 5 mat */
 
-#define APP_MODE                  APP_MODE_MISSION /* SAFETY: test calib before mission */
+#define APP_MODE                  APP_MODE_MISSION  /* SAFETY: test calib before mission */
 
 /* USER CODE END PD */
 

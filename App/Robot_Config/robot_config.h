@@ -102,8 +102,8 @@
 /* ================= BO TAO QUY DAO VAN TOC / DUNG VI TRI ================= */
 
 #define AGV_CRUISE_SPEED_MM_S          400.0f
-#define AGV_ACCEL_MM_S2                250.0f
-#define AGV_DECEL_MM_S2                250.0f
+#define AGV_ACCEL_MM_S2                800.0f
+#define AGV_DECEL_MM_S2                800.0f
 
 /* Phanh gap khi gap cuoi line */
 #define AGV_END_DECEL_MM_S2            1500.0f
@@ -129,19 +129,21 @@
 
 /* ================= BO DIEU KHIEN BAM LINE (VONG NGOAI, LYAPUNOV) =================
  *
- * LINE_LAW_KANAYAMA : luat (5.13) cua bao cao
- *       v = v_R * cos(e3) + k1*e1          (e1 = 0 vi cam bien khong do doc line)
- *       w = k2 * e2 * v_R + w_R + k3 * sin(e3)
- *       V = (e1^2 + e2^2)/2 + (1 - cos e3)/k2
- *   e2 do tu day cam bien, e3 uoc luong boi bo quan sat (thay cho (5.17)).
- *   w_R = v_R * do_cong_line: tren xe that khong biet truoc nen = 0.
+ * LINE_LAW_STATE_FEEDBACK: Chuong 5 (5.27), phan hoi e2_hat tai truc banh M
+ * va e3_hat tu bo quan sat co phuong trinh do eC = e2 + l*e3.
  *
- * LINE_LAW_PID_LYAP : ban PID + thich nghi cua minh (D tu quan sat, I thich nghi)
+ * LINE_LAW_KANAYAMA: bien the cu, dung sai so tai C va gain ngang k2*v.
+ * LINE_LAW_PID_LYAP: ban PID + thich nghi (D tu quan sat, I thich nghi).
  */
 
 #define LINE_LAW_KANAYAMA              0
 #define LINE_LAW_PID_LYAP              1
-#define LINE_LAW                       LINE_LAW_KANAYAMA
+#define LINE_LAW_STATE_FEEDBACK        2
+#define LINE_LAW                       LINE_LAW_STATE_FEEDBACK
+
+/* Chuong 5: k2 [rad/(s*mm)], k3 [rad/s], w = -k2*e2_hat - k3*sin(e3_hat). */
+#define LINE_STATE_K2                  0.095f
+#define LINE_STATE_K3                  6.0f
 
 /* Kanayama:  k2 [rad / mm^2],  k3 [rad / s]   (k2, k3 > 0) */
 #define LINE_K2                        2.5e-4f
@@ -153,16 +155,18 @@
 #define LYAP_GAMMA                     0.010f
 #define LYAP_I_LIMIT                   0.8f        /* rad/s */
 
-/* Bo quan sat (y, theta): tan so rieng va he so tat dan */
-#define OBS_WN                         12.0f
-#define OBS_ZETA                       0.9f
+/* Bo quan sat (eC, theta): tan so rieng (rad/s) va he so tat dan. */
+#define OBS_STATE_WN                   10.0f       /* Luat Chuong 5 */
+#define OBS_WN                         12.0f       /* Cac luat cu */
+#define OBS_ZETA                       0.95f
 
 /* Kep sai lech do (mm) dua vao bo quan sat: cac buoc nhay do 5 mat
    luong tu hoa khong bi hieu thanh goc lech lon. Kep goc theta_hat (rad). */
 #define OBS_INNOV_MAX_MM               12.0f
 #define OBS_THETA_MAX_RAD              0.8f
 
-/* Van toc nho nhat dung trong bo quan sat (tranh chia cho 0) */
+/* San van toc khi tinh gain L2. Che do (5.27) giam hieu chinh goc
+   duoi san nay vi goc khong quan sat duoc khi xe dung. */
 #define OBS_V_MIN_MM_S                 150.0f
 
 /* Mat line: giu omega cu trong thoi gian nay roi ve 0 */

@@ -157,7 +157,7 @@ void MotionTest_Init(MotionTest_t test)
 {
     static const AGV_Segment_t seg_straight =
     {
-        .target_mm = 1000.0f, .cruise_mm_s = 250.0f, .line_follow = 0,
+        .target_mm = 2000.0f, .cruise_mm_s = 500.0f, .line_follow = 0,
         .stop_on_line_end = 0, .slow_dist_mm = 0.0f,
         .slow_speed_mm_s = 0.0f, .overrun_mm = 0.0f
     };
@@ -214,7 +214,7 @@ void MotionTest_Init(MotionTest_t test)
     else if (test == MOTION_TEST_FOLLOW)
     {
         AGV_Motion_Start(&seg_follow);
-        BSP_UART_Printf("t_ms,s,vref,v,d10,w100,th1000\r\n");
+        BSP_UART_Printf("t_ms,s,vref,v,d10,w100,th1000,eM10,wmeas100,line\r\n");
     }
 }
 
@@ -245,7 +245,7 @@ void MotionTest_Run(void)
 
         if      (t < 500U)   { ref = 0.0f;   }
         else if (t < 2500U)  { ref = 150.0f; }
-        else if (t < 4500U)  { ref = 300.0f; }
+        else if (t < 4500U)  { ref = 500.0f; }
         else if (t < 6000U)  { ref = 100.0f; }
         else
         {
@@ -279,14 +279,17 @@ void MotionTest_Run(void)
     {
         last_print = HAL_GetTick();
 
-        BSP_UART_Printf("%lu,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
+        BSP_UART_Printf("%lu,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%u\r\n",
                         (unsigned long)t,
                         (long)AGV_Motion_GetDistance(),
                         (long)AGV_Motion_GetSpeedRef(),
                         (long)Encoder_GetCenterSpeed(),
                         (long)(LineTracking_GetError() * 10.0f),
                         (long)(AGV_Motion_GetOmegaCmd() * 100.0f),
-                        (long)(LineTracking_GetHeadingEst() * 1000.0f));
+                        (long)(LineTracking_GetHeadingEst() * 1000.0f),
+                        (long)(LineTracking_GetAxleErrorEst() * 10.0f),
+                        (long)(Encoder_GetYawRate() * 100.0f),
+                        (unsigned)LineSensor_GetData()->status);
     }
 
     if (AGV_Motion_GetState() != AGV_MOTION_RUNNING)

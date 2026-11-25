@@ -29,4 +29,7 @@ float LineTracking_GetSpeedFactor(void);
 /* Uoc luong goc lech (rad) cua bo quan sat */
 float LineTracking_GetHeadingEst(void);
 
+/* Uoc luong e2 tai tam truc banh (mm), DUONG = xe lech PHAI cua line */
+float LineTracking_GetAxleErrorEst(void);
+
 #endif /* LINE_TRACKING_H */
